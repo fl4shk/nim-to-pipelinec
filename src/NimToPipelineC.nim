@@ -1,5 +1,5 @@
 import std/macros
-import std/strutils
+import strutils
 import std/tables#, src/fusion/matching
 import Borrowed
 
@@ -97,13 +97,22 @@ import Borrowed
 type
   Convert = object
     funcTbl: Table[string, string]
-    typedefTbl: Table[string, string]
+    funcSeq: seq[string]
+    typedefTbl: Table[string, seq[string]]
+    typedefSeq: seq[string]
     res: string
     useResult: bool
 
 macro fail(): untyped =
   result = quote do:
-    assert(false, repr(n) & " disallowed (maybe just for now?)")
+    assert(
+      false,
+      (
+        $n.kind & " " & repr(n) & " disallowed (maybe just for now?): "
+      ) & (
+        n.treeRepr
+      )
+    )
   
 proc have(
   n: NimNode,
@@ -115,6 +124,20 @@ proc have(
     if n[i + start].kind != kinds[i]:
       result = false
 
+proc toCodeExpr(
+  self: var Convert,
+  nodes: NimNode,
+  #res: var string,
+  level: int,
+  isLhs: static bool,
+  isTypeInst: bool=false,
+)
+proc toCodeStmts(
+  self: var Convert,
+  nodes: NimNode,
+  #res: var string,
+  level: int
+)
 
 proc toCodeIfStmt(
   self: var Convert,
@@ -122,14 +145,31 @@ proc toCodeIfStmt(
   #res: var string,
   level = 0
 ) =
+  var first: bool = true
   for n in nodes:
     case n.kind:
     of nnkEmpty:
       discard
     of nnkElifBranch:
-      discard
+      addIndent(self.res, level)
+      if not first:
+        self.res.add "else "
+      else:
+        first = false
+      self.res.add "if ("
+      self.toCodeExpr(n[0], level, false)
+      self.res.add ") {\n"
+
+      addIndent(self.res, level)
+      self.toCodeStmts(n[1], level + 1)
+      addIndent(self.res, level)
+      self.res.add "}\n"
     of nnkElse:
-      discard
+      addIndent(self.res, level)
+      self.res.add "else {\n"
+      self.toCodeStmts(n[0], level + 1)
+      addIndent(self.res, level)
+      self.res.add "}\n"
     else:
       fail()
 
@@ -156,10 +196,57 @@ proc toCodeExprInner(
   #res: var string,
   level: int,
   isLhs: static bool,
+  isTypeInst: bool=false,
 ): string =
   var n = nodes
   #echo n.kind
-  #echo repr(n)
+  if isTypeInst:
+    #echo "isTypeInst: " & repr(n)
+    case n.kind:
+    of nnkIdent, nnkSym:
+      var tempStr = n.strVal
+      #result.add n.strVal
+      result.add tempStr.replace("_", "_a")
+      result.add "_c"
+    #of nnkSym:
+    #  result.add n.strVal
+    of nnkBracketExpr:
+      result.add self.toCodeExprInner(n[0], level, isLhs, isTypeInst)
+      result.add "_b"
+      result.add self.toCodeExprInner(n[1], level, isLhs, isTypeInst)
+      result.add "_d"
+    of nnkUIntLit, nnkUInt8Lit, nnkUInt16Lit, nnkUInt32Lit, nnkUInt64Lit:
+      #result.add("((int)" & $n.intVal & ")")
+      # only allow unsigned integer literals
+      result.add($n.intVal)
+    of nnkCall:
+      #echo "typeinst nnkCall: "
+      #echo n.treeRepr
+      if n.len >= 3:
+        if n[0].kind == nnkOpenSymChoice:
+          result.add self.toCodeExprInner(n[1], level, isLhs, isTypeInst)
+          result.add "_b"
+          for param in n[2 .. ^1]:
+            result.add self.toCodeExprInner(
+              param, level, isLhs, isTypeInst
+            )
+            result.add "_d"
+        else:
+          echo n.repr
+          echo n.treeRepr
+          fail()
+      else:
+        echo "typeinst nnkCall other len: "
+        echo n.repr
+        echo n.treeRepr
+        fail()
+    else:
+      echo "typeinst nnkOther:"
+      echo n.treeRepr
+      fail()
+
+    return result
+
   case n.kind:
   of nnkIdent, nnkSym:
     result.add n.strVal
@@ -190,49 +277,63 @@ proc toCodeExprInner(
     #  discard
     #else:
     #echo "test: " & $n.len
+    #when not isTypeInst:
     result.add self.toCodeExprInner(n[0], level, isLhs)
     result.add "["
-    result.add self.toCodeExprInner(n[1], level, isLhs)
+    result.add self.toCodeExprInner(n[1], level, false)
     result.add "]"
   #of nnkResult:
   #  discard
   of nnkChckRange:
     # skip check range and treat it as a hidden cast instead
     var typeStr = typeRename(n.getType.repr)
+    #echo("typeStr 0: ", typeStr)
     result.add "(("
     result.add typeStr
     result.add ")"
-    result.add self.toCodeExprInner(n[0], level, isLhs)
+    result.add self.toCodeExprInner(n[0], level, false)
     result.add ")"
   of nnkHiddenStdConv:
     var typeStr = typeRename(n.getType.repr)
+    #echo("typeStr 1: ", typeStr)
     #if typeStr == "float" and n[1].kind == nnkIntLit:
     #  discard
     #elif typeStr == "float" and n[1].kind == nnkFloatLit:
     #  discard
     if typeStr.startsWith("range["):
-      result.add self.toCodeExprInner(n[1], level, isLhs)
+      result.add self.toCodeExprInner(n[1], level, false)
     else:
       for j in 1 .. n.len-1:
         result.add "(("
         result.add typeStr
         result.add ")"
-        result.add self.toCodeExprInner(n[1], level, isLhs)
+        result.add self.toCodeExprInner(n[1], level, false)
         result.add ")"
 
   else:
     when not isLhs:
       case n.kind:
       of nnkIntLit:
-        result.add("((int)" & $n.intVal & ")")
+        #result.add("((int)" & $n.intVal & ")")
+        result.add($n.intVal)
+      of nnkUIntLit:
+        result.add("((unsigned int)" & $n.intVal & ")")
       of nnkInt8Lit:
         result.add("((int8_t)" & $n.intVal & ")")
+      of nnkUInt8Lit:
+        result.add("((uint8_t)" & $n.intVal & ")")
       of nnkInt16Lit:
         result.add("((int16_t)" & $n.intVal & ")")
+      of nnkUInt16Lit:
+        result.add("((uint16_t)" & $n.intVal & ")")
       of nnkInt32Lit:
         result.add("((int32_t)" & $n.intVal & ")")
+      of nnkUInt32Lit:
+        result.add("((uint32_t)" & $n.intVal & ")")
       of nnkInt64Lit:
         result.add("((int64_t)" & $n.intVal & ")")
+      of nnkUInt64Lit:
+        result.add("((uint64_t)" & $n.intVal & ")")
       of nnkFloatLit, nnkFloat32Lit:
         result.add("((float)" & $n.floatVal & ")")
       #of nnkFloat32Lit:
@@ -241,7 +342,17 @@ proc toCodeExprInner(
       #  discard
       of nnkObjConstr:
         #echo repr(n)
-        let typeName = n[0].strVal
+        ##echo n.strVal
+        #echo n[0].kind
+        var typeName: string
+        case n[0].kind:
+        of nnkBracketExpr:
+          typeName = self.toCodeExprInner(
+            n[0], level, isLhs, true
+          )
+        else:
+          typeName = n[0].strVal
+
         result.add "(("
         result.add typeName
         result.add "){"
@@ -286,8 +397,9 @@ proc toCodeExpr(
   #res: var string,
   level: int,
   isLhs: static bool,
+  isTypeInst: bool=false
 ) =
-  self.res.add self.toCodeExprInner(nodes, level, isLhs)
+  self.res.add self.toCodeExprInner(nodes, level, isLhs, isTypeInst)
   discard
 
 proc toCodeAsgn(
@@ -364,9 +476,16 @@ proc toCodeTypeSection(
   case n.kind:
   of nnkTypeDef:
     # `n[0]` should be the `nnkIdent` or `nnkSym`
-    discard
+    echo n.len
   else:
     fail()
+
+#proc toCodeTypeInst(
+#  self: var Convert,
+#  nodes: NimNode,
+#  level = 0,
+#): string = 
+#  self.toCodeExprInner(nodes, level, false, true)
 
 proc toCodeVarSection(
   self: var Convert,
@@ -391,8 +510,13 @@ proc toCodeVarSection(
         )
       ):
         #if n[1].strVal != "array":
-        if n[1].kind != nnkBracketExpr:
-          self.toCodeExpr(n[1], level, isLhs=true)
+        if (
+          n[1].kind != nnkBracketExpr
+        ):
+          #echo repr(n)
+          #echo n.treeRepr
+          #echo "----"
+          self.toCodeExpr(n[1], level, isLhs=false, isTypeInst=true)
           self.res.add " "
           self.toCodeExpr(n[0], level, isLhs=true)
           if not have(n, @[nnkEmpty], 2):
@@ -401,67 +525,85 @@ proc toCodeVarSection(
         elif (
           (
             have(n[1], @[nnkSym])
-          ) and (
-            n[1][0].strVal == "array"
           )
+          #and (
+          #)
         ):
-          #echo repr(n[1])
-          proc handleArray(
-            self: var Convert,
-            nodes: NimNode,
-            ret: var seq[string],
-            level = 0
-          ) =
-            let n = nodes
-            if (
-              (
-                n.kind == nnkBracketExpr
-              )
-            ):
-              #if have(n, @[nnkSym]):
-              ret.add self.toCodeExprInner(
-                nodes=n[1],
-                level=level,
-                isLhs=false,
-              )
-              if (
-                (
-                  have(n, @[nnkSym])
-                ) and (
-                  n[0].strVal == "array"
-                )
-              ):
-                self.handleArray(
-                  nodes=n[2],
-                  ret=ret,
-                  level=level,
-                )
-            elif n.kind == nnkSym:
-              ret.add self.toCodeExprInner(
-                nodes=n,
-                level=level,
-                isLhs=false,
-              )
-            else:
-              fail()
-          var mySeq: seq[string]
           #echo repr(n)
-          #echo repr(n[0])
-          #echo repr(n[1])
-          self.handleArray(
-            nodes=n[1],
-            ret=mySeq,
-            level=level
-          )
-          self.res.add mySeq[^1]
-          self.res.add " "
-          #self.res.add n[0].strVal
-          self.toCodeExpr(n[0], level, isLhs=false)
-          if mySeq.len > 1:
-            for i in 0 ..< mySeq.len - 1:
-              self.res.add "["
-              self.res.add mySeq[i]
-              self.res.add "]"
+          if n[1][0].strVal == "array":
+            proc handleArray(
+              self: var Convert,
+              nodes: NimNode,
+              ret: var seq[string],
+              level = 0
+            ) =
+              let n = nodes
+              if (n.kind == nnkBracketExpr):
+                #if have(n, @[nnkSym]):
+                #echo "n.kind == nnkBracketExpr: " & repr(n) & ": " & $n.len
+                #echo n.kind
+                ret.add self.toCodeExprInner(
+                  nodes=n[1],
+                  level=level,
+                  isLhs=false,
+                )
+                if (
+                  (
+                    have(n, @[nnkSym])
+                  ) and (
+                    n[0].strVal == "array"
+                  )
+                ):
+                  #echo "have array: " & n[0].strVal
+                  self.handleArray(
+                    nodes=n[2],
+                    ret=ret,
+                    level=level,
+                  )
+                else:
+                  ret.add self.toCodeExprInner(
+                    nodes=n,
+                    level=level,
+                    isLhs=false,
+                    isTypeInst=true,
+                  )
+                  #if n.len > 0:
+                  #  echo "don't have array: " & n[0].strVal & ": " & $n.len
+              elif n.kind == nnkSym:
+                #echo "handleArray(): " & repr(n)
+                ret.add self.toCodeExprInner(
+                  nodes=n,
+                  level=level,
+                  isLhs=false,
+                  isTypeInst=true,
+                )
+              else:
+                fail()
+            var mySeq: seq[string]
+            #echo repr(n)
+            #echo repr(n[0])
+            #echo repr(n[1])
+            self.handleArray(
+              nodes=n[1],
+              ret=mySeq,
+              level=level
+            )
+            self.res.add mySeq[^1]
+            self.res.add " "
+            self.toCodeExpr(n[0], level, isLhs=false, isTypeInst=true)
+            if mySeq.len > 1:
+              for i in 0 ..< mySeq.len - 1:
+                self.res.add "["
+                self.res.add mySeq[i]
+                self.res.add "]"
+          else:
+            #echo "test: " & repr(n)
+            self.toCodeExpr(n[1], level, isLhs=true, isTypeInst=true)
+            self.res.add " "
+            self.toCodeExpr(n[0], level, isLhs=true)
+            if not have(n, @[nnkEmpty], 2):
+              self.res.add " = "
+              self.toCodeExpr(n[2], level, isLhs=false)
         else:
           fail()
         self.res.add ";\n"
@@ -503,6 +645,7 @@ proc toCodeStmts(
   addIndent(self.res, level)
   #echo repr(nodes)
   #echo repr(nodes.kind)
+  #echo nodes.treeRepr
   proc innerFunc(
     self: var Convert,
     n: NimNode,
@@ -534,15 +677,29 @@ proc toCodeStmts(
     #  discard
     #of nnkElse:
     #  discard
+    of nnkBracket:
+      #echo repr(n)
+      #n.dumpAstGen
+      #dumpLisp(n)
+      #echo n.treeRepr
+      discard
+    of nnkCommentStmt:
+      discard
     else:
       #echo n
+      #echo repr(n)
+      echo n.kind
       fail()
 
+  #echo repr(nodes)
+  #echo nodes.kind
   #echo repr(nodes.kind)
   case nodes.kind:
     of nnkStmtList:
       for n in nodes:
         self.innerFunc(n, level)
+    of nnkCommentStmt:
+      discard
     else:
       self.res.addIndent level
       self.innerFunc(nodes, level)
@@ -594,9 +751,11 @@ proc procDef(
   var procName = ""
   var paramsStr = ""
   var returnType = "void"
+  #result[0] = false
 
   assert topLevelNode.kind in {nnkProcDef, nnkFuncDef}
   for n in topLevelNode:
+    #echo n.treeRepr
     case n.kind:
     of nnkEmpty:
       discard
@@ -605,9 +764,47 @@ proc procDef(
       discard
     of nnkSym:
       procName = $n
+    of nnkAccQuoted:
+      if n.len == 1:
+        procName = $n[0]
+      else:
+        fail()
+    of nnkBracket:
+      if (
+        (
+          n[0].kind == nnkEmpty
+        ) and (
+          n[1].kind == nnkGenericParams
+        )
+      ):
+        let n = n[1]
+        if n[0].kind == nnkIdentDefs:
+          for i in 0 ..< n[0].len:
+          #for paramDef in n[0]:
+            let paramDef = n[0][i]
+            if (
+              (
+                paramDef.kind != nnkEmpty
+              ) and (
+                i != 0
+              )
+            ):
+              echo "temp: asdf"
+              fail()
+            else:
+              discard
+        else:
+          echo "temp 1: asdf"
+          fail()
     of nnkFormalParams:
       if n[0].kind != nnkEmpty:
-        returnType = n[0].strVal
+        #returnType = n[0].strVal
+        returnType = self.toCodeExprInner(
+          nodes=n[0],
+          level=0,
+          isLhs=false,
+          isTypeInst=true,
+        )
       for paramDef in n[1 .. ^1]:
         # the paramDef is like `x, y, z: float`
         if paramDef.kind != nnkEmpty:
@@ -622,26 +819,34 @@ proc procDef(
             #dumpAstNode(n)
             #dumpTree(n)
             if paramType.kind == nnkVarTy:
+              #echo "test"
               fail()
-            elif paramType.kind == nnkBracketExpr:
-              fail()
-            #else:
-            #  paramsStr.add ""
-            paramsStr.add paramType.strVal
+            #elif paramType.kind == nnkBracketExpr:
+            #  #fail()
+            else:
+              #paramsStr.add ""
+              #paramsStr.add paramType.strVal
+              paramsStr.add self.toCodeExprInner(
+                nodes=paramType,
+                level=0,
+                isLhs=false,
+                isTypeInst=true,
+              )
             paramsStr.add " "
             paramsStr.add paramName
             paramsStr.add ",\n"
-          # remove the final ",\n" since C doesn't support that
       if paramsStr.len > 0:
+        # remove the final ",\n" since C doesn't support that
         paramsStr.setLen(paramsStr.len - 2)
         paramsStr.add "\n"
     else:
       self.res.setLen(0)
       self.res.add "\n"
-      self.res.add returnType & " " & procName & "(\n"
+      self.res.add returnType & " " & procName & "("
       if paramsStr.len == 0:
-        self.res.add "  void"
+        self.res.add "void"
       else:
+        self.res.add "\n"
         self.res.add paramsStr
       self.res.add ") {\n"
       self.useResult = self.hasResult(n)
@@ -654,18 +859,20 @@ proc procDef(
         if "return result" notin self.res[^20..^1]:
           self.res.addIndent(1)
           self.res.add "return result;\n"
+        else:
+          self.res.add "\n"
+      else:
+        self.res.add "\n"
       self.res.add "}"
 
   #echo paramsStr
-  echo self.res
+  #echo self.res
   result = self.res
 
 
-proc findFuncs(
+proc findTopLevel(
   self: var Convert,
   topLevelNode: NimNode,
-  #funcTbl: var Table[string, string],
-  #typedefTbl: var Table[string, string],
 ) =
   for n in topLevelNode:
     if n.kind == nnkCall:
@@ -682,10 +889,52 @@ proc findFuncs(
         )
       ):
         continue
-      let impl = n[0].getImpl()
-      #echo repr(impl)
-      self.findFuncs(impl)
-      self.funcTbl[procName] = self.procDef(impl)
+      #echo repr(n)
+      #echo repr(n[0])
+      #echo n.kind
+      #echo n[0].kind
+      #echo n.len
+      #echo n.getSym 
+      #echo n.strVal
+
+      #let ast = n.getAst
+      #echo repr(ast)
+      #echo getType(n[0])
+      #try: 
+
+      case n[0].kind:
+      of nnkIdent:
+        echo repr(n)
+        #echo n[0]
+        echo n.treeRepr
+        echo "test in findTopLevel()"
+        fail() # can't have 
+      of nnkSym:
+        #echo n[0].kind
+        #echo n[0].symKind()
+        let impl = n[0].getImpl()
+        ###echo repr(impl)
+        self.findTopLevel(impl)
+        self.funcSeq.add self.procDef(impl)
+        self.funcTbl[procName] = self.funcSeq[^1]
+      else:
+        echo "test in findTopLevel() 1"
+        echo repr(n[0])
+        discard
+
+      #except:
+      #  try:
+      #    discard
+      #  except:
+      #    discard
+
+        
+        
+
+      #try:
+      #  let impl = n[0].getAst()
+      #except:
+      #  discard
 
     #if (
     #  n.kind == nnkVarSection
@@ -730,7 +979,7 @@ proc findFuncs(
     #  #findFuncsTypedefs(impl, funcTbl, typedefTbl)
     #  #typedefTbl[typedefName] = typeDef(impl)
 
-    self.findFuncs(n)
+    self.findTopLevel(n)
 
 
 proc toPipelineCInner*(
@@ -749,7 +998,7 @@ proc toPipelineCInner*(
   #  #res=code,
   #)
   var convert: Convert
-  convert.findFuncs(n)
+  convert.findTopLevel(n)
   #echo convert.funcTbl
   #echo convert.typedefTbl
   #var globals: Table[string, string]
@@ -758,17 +1007,18 @@ proc toPipelineCInner*(
   ##  code.add(v)
   ##  code.add "\n"
 
-  #for k, v in typedefTbl:
-  #  code.add(v)
-  #  code.add "\n"
-  #code.add "\n"
+  for v in convert.typedefSeq:
+    code.add(v)
+    code.add "\n"
+  code.add "\n"
 
-  #for k, v in funcTbl:
-  #  code.add v
-  #  code.add "\n"
-  #code.add "\n"
+  for v in convert.funcSeq:
+    code.add v
+    code.add "\n"
+  code.add "\n"
 
   ##toCodeTopLevel(topLevelNode=n, res=code, level=0)
+  #code = convert.res
 
   return code
 

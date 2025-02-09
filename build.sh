@@ -28,7 +28,7 @@ MY_NIM_OPTS="$MY_NIM_OPTS --floatChecks:off --nanChecks:off --infChecks:off"
 #MY_NIM_OPTS="$MY_NIM_OPTS --gcc.cpp.linkerexe:snowhousecpu-unknown-elf-g++"
 #MY_NIM_OPTS="$MY_NIM_OPTS --l:-Wl,--relax"
 MY_NIM_OPTS="$MY_NIM_OPTS --parallelBuild:0"
-MY_NIM_OPTS="$MY_NIM_OPTS --experimental:caseStmtMacros"
+#MY_NIM_OPTS="$MY_NIM_OPTS --experimental:caseStmtMacros"
 #MY_NIM_OPTS="$MY_NIM_OPTS --run"
 
 #echo nim $MY_NIM_OPTS src/Main.nim #panicoverride.nim
