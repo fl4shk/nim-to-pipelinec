@@ -42,83 +42,6 @@ import std/macros, NimToPipelineC
 #    result = temp.myMain
 #  echo toPipelineC(main)
 
-macro doTypedefVec3(
-  T: untyped
-): untyped =
-  let name = ident("Vec3_" & $T)
-  let plusName = ident(name.strVal & "_plus")
-  #let plusOpName = ident("`+`")
-  let minusName = ident(name.strVal & "_minus")
-  #let minusOpName = ident("system.-")
-  let starName = ident(name.strVal & "_star")
-  #let starOpName = ident("system.*")
-  let slashName = ident(name.strVal & "_slash")
-  #let slashOpName = ident("system./")
-  #result = newStmtList()
-  result = quote do:
-    type
-      `name`* = object
-        x*: `T`
-        y*: `T`
-        z*: `T`
-    proc `plusName`*(
-      left: `name`,
-      right: `name`,
-    ): `name` =
-      `name`(
-        x: left.x + right.x,
-        y: left.y + right.y,
-        z: left.z + right.z,
-      )
-    template plus*(
-      left: `name`,
-      right: `name`,
-    ): `name` =
-      left.`plusName` right
-    proc `minusName`*(
-      left: `name`,
-      right: `name`,
-    ): `name` =
-      `name`(
-        x: left.x - right.x,
-        y: left.y - right.y,
-        z: left.z - right.z,
-      )
-    template minus*(
-      left: `name`,
-      right: `name`,
-    ): `name` =
-      left.`minusName` right
-    proc `starName`*(
-      left: `name`,
-      right: `T`,
-    ): `name` =
-      `name`(
-        x: left.x * right,
-        y: left.y * right,
-        z: left.z * right,
-      )
-    template star*(
-      left: `name`,
-      right: `T`,
-    ): `name` =
-      left.`starName` right
-    proc `slashName`*(
-      left: `name`,
-      right: `T`,
-    ): `name` =
-      `name`(
-        x: left.x div right,
-        y: left.y div right,
-        z: left.z div right,
-      )
-    template slash*(
-      left: `name`,
-      right: `T`,
-    ): `name` =
-      left.`slashName` right
-
-doTypedefVec3(int)
 
 #macro mkMyMain(
 #  T: untyped
@@ -178,31 +101,124 @@ doTypedefVec3(int)
 
 #dumpAstGen:
 #dumpTree:
+macro doTypedefVec3(
+  T: untyped
+): untyped =
+  let name = ident("Vec3_" & $T)
+  let plusName = ident(name.strVal & "_plus")
+  #let plusOpName = ident("`+`")
+  let minusName = ident(name.strVal & "_minus")
+  #let minusOpName = ident("system.-")
+  let starName = ident(name.strVal & "_star")
+  #let starOpName = ident("system.*")
+  let slashName = ident(name.strVal & "_slash")
+  #let slashOpName = ident("system./")
+  #result = newStmtList()
+  result = quote do:
+    type
+      `name` = object
+        x*: `T`
+        y*: `T`
+        z*: `T`
+    proc `plusName`(
+      left: `name`,
+      right: `name`,
+    ): `name` =
+      `name`(
+        x: left.x + right.x,
+        y: left.y + right.y,
+        z: left.z + right.z,
+      )
+    template plus(
+      left: `name`,
+      right: `name`,
+    ): `name` =
+      left.`plusName` right
+    proc `minusName`(
+      left: `name`,
+      right: `name`,
+    ): `name` =
+      `name`(
+        x: left.x - right.x,
+        y: left.y - right.y,
+        z: left.z - right.z,
+      )
+    template minus(
+      left: `name`,
+      right: `name`,
+    ): `name` =
+      left.`minusName` right
+    proc `starName`(
+      left: `name`,
+      right: `T`,
+    ): `name` =
+      `name`(
+        x: left.x * right,
+        y: left.y * right,
+        z: left.z * right,
+      )
+    template star(
+      left: `name`,
+      right: `T`,
+    ): `name` =
+      left.`starName` right
+    proc `slashName`(
+      left: `name`,
+      right: `T`,
+    ): `name` =
+      `name`(
+        x: left.x div right,
+        y: left.y div right,
+        z: left.z div right,
+      )
+    template slash(
+      left: `name`,
+      right: `T`,
+    ): `name` =
+      left.`slashName` right
+
+doTypedefVec3(int)
+#dumpTree:
+type
+  Asdf = object
+    a*: int
+    v*: Vec3_int
+var
+  a: Asdf
+  b = Asdf(a: 3)
+var c: Asdf = Asdf(a: b.a)
+var e: array[8, int]
+
+proc doAsdf(
+  asdf: Asdf,
+  b: int,
+): Asdf =
+  var temp: Asdf = Asdf(
+    a: asdf.a + b,
+    v: Vec3_int(x:0, y:1, z:2)
+  )
+  var e: array[3, array[8, Asdf]]
+  result = e[temp.a][temp.a + 1]
+
+proc myMain() =
+  var a: Asdf 
+  var c: Asdf
+  var b: Asdf = c.doAsdf(
+    b=8
+  )
+  #if b.v.x == b.v.y:
+  b = a.doAsdf(9)
+  #var d = doAsdf(asdf=c, b=8)
+  #a.a = 9
+  #var arr: array[2, array[3, Vec3_int]]
+  #for j in 0 ..< arr.len:
+  #  for i in 0 ..< arr[j].len:
+  #    arr[j][i].x = arr[j][i].x + 1
 proc testPipelineC() =
-  type
-    Asdf = object
-      a*: int
-      v*: Vec3_int
-  var
-    a: Asdf
-    b = Asdf(a: 3)
-  var c: Asdf = Asdf(a: b.a)
+  myMain()
+#dumpTree:
+  #include MainInc
 
-  proc doAsdf(
-    asdf: Asdf,
-    b: int,
-  ): Asdf =
-    return Asdf(
-      a: asdf.a + b,
-      v: Vec3_int(x:0, y:1, z:2)
-    )
-
-  var d = doAsdf(asdf=c, b=8)
-  a.a = 9
-  var arr: array[2, array[3, Vec3_int]]
-  for j in 0 ..< arr.len:
-    for i in 0 ..< arr[j].len:
-      arr[j][i].x = arr[j][i].x + 1
 
 echo toPipelineC(testPipelineC)
 
