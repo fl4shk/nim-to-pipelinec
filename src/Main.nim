@@ -52,21 +52,24 @@ proc doAsdf[T, U](
   #const
   #  eSize2dX = 8
   #  eSize2dY = 3
-  #var e: array[3, array[8, Asdf[T]]]
+  var e: array[3, array[8, Vec3[Asdf[T]]]]
   ##var e: array[3, array[8, Vec3[int]]]
-  #if e[0][0].v.x == 0:
-  #  e[1][1].a = 9
-  #elif e[0][0].v.y == 0:
-  #  e[0][0].v.z = 8
-  #else:
-  #  e[2][2].a = 7
+  if e[0][0].x.v.x == 0:
+    e[1][1].x.a = 9
+  elif e[0][0].x.v.y == 0:
+    e[0][0].x.v.z = 8
+  else:
+    e[2][2].x.a = 7
   #var f: array[3, array[8, Vec3[int]]]
-  #result = e[temp.a][(temp.a) + 1]
-  result = temp
+  var f: array[3, array[8, int]]
+  result = e[temp.a][(temp.a) + 1].x
+  #result = temp
 
 #doTypedefVec3(int)
 
-proc myMain[T](): Asdf[T] =
+proc myMain[T](
+  e: Vec3[Asdf[T]]
+): Asdf[T] =
   var a: Asdf[T]
   var c: Asdf[T]
   var b: Asdf[T] = doAsdf[T, float](
@@ -89,12 +92,30 @@ proc myMain[T](): Asdf[T] =
   #var a: TriVert
   result = b
 #myMain()
+proc myMain2[T](
+  a, c: Vec3[Asdf[T]],
+  b: Asdf[int16],
+): int =
+  result = 3
 proc myOuterMain(): int =
-  result = myMain[int]().a
+  #var e: Asdf[int]
+  var e: Vec3[Asdf[int]]
+  var t: array[8, Asdf[int]]
+  result = myMain[int](
+    e=e
+  ).a
+  #var a: Vec3[Asdf[int8]]
+  #var b: Asdf[int16]
+  #result = myMain2(
+  #  a=a,
+  #  c=a,
+  #  b=b,
+  #)
 proc myOuterOuterMain(): int =
   result = myOuterMain()
 #let temp = 
-echo toPipelineC(bindSym("myOuterOuterMain"))
+#echo toPipelineC(bindSym("myOuterOuterMain"))
+echo toPipelineC(myOuterOuterMain)
 
 
 #var a = Vec3(int)(x:9, y: 8, z: 7)
