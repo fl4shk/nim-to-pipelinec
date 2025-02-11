@@ -58,7 +58,12 @@ template `z=`*(
 proc mkVec3[T](
   x, y, z: T,
 ): Vec3[T] =
-  result = Vec3[T](v: [x, y, z])
+  var temp: Vec3[T]
+  #result = Vec3[T](v: [x, y, z])
+  temp.x = x
+  temp.y = y
+  temp.z = z
+  result = temp
 
 proc `plus`*[T](
   left: Vec3[T],
@@ -68,15 +73,10 @@ proc `plus`*[T](
   for i in 0 ..< result.v.len():
     result[i] = left[i] + right[i]
 
-  # example 2:
-  result.x = left.x + right.x
-  result.y = left.y + right.y
-  result.z = left.z + right.z
-  #result = mkVec3[T](
-  #  x=left.x + right.x,
-  #  y=left.y + right.y,
-  #  z=left.z + right.z,
-  #)
+  ## example 2:
+  #result.x = left.x + right.x
+  #result.y = left.y + right.y
+  #result.z = left.z + right.z
 
 template `+`*(
   left: Vec3,
@@ -95,14 +95,19 @@ proc doVec3IAdd(
 #  result = quote do:
 #    "#pragma MAIN_MHZ myMain 100.0"
 
-proc myMain(): Vec3[int] =
+proc myMain(
+  a: Vec3[int],
+  b: Vec3[int],
+): Vec3[int] =
   #{.craw: myPragmaStr.}
-  let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
-  let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
+  #let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
+  #let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
   result = doVec3IAdd(a=a, b=b)
 
 proc myOuterMain(): Vec3[int] =
-  result = myMain()
+  let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
+  let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
+  result = myMain(a=a, b=b)
 echo toPipelineC(myOuterMain)
 
 #

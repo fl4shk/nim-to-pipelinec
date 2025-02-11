@@ -152,7 +152,7 @@ proc toCodeForStmt(
   if have(n, @[nnkSym, nnkInfix]):
     let mySym = n[0].repr()
     addIndent(self.res, level)
-    self.res.add "int "
+    self.res.add "int32_t "
     self.res.add mySym
     self.res.add ";\n"
     addIndent(self.res, level)
@@ -803,20 +803,21 @@ proc toCodeExprInner(
         #else:
         #  typeName = n[0].strVal
 
-        result.add "(("
-        result.add typeName
-        result.add "){"
+        #result.add "(("
+        #result.add typeName
+        #result.add "){"
+        result.add "{"
         for i in 1 ..< n.len:
           #if n[i].len == 2:
-          result.add "."
-          result.add n[i][0].strVal
-          result.add "="
+          #result.add "."
+          #result.add n[i][0].strVal
+          #result.add "="
           result.add self.toCodeExprInner(n[i][1], level, isLhs)
           #else:
           #  self.toCodeExprInner(n[i][0], level, isLhs)
           if i + 1 < n.len:
             result.add ", "
-        result.add "})"
+        result.add "}"
       of nnkCall:
         var procName: string = n[0].strVal #& "_f"
         #echo "expr nnkCall: ", procName
@@ -1706,6 +1707,7 @@ proc toPipelineCInner*(
   code.add "#else\n"
   code.add "#include \"intN_t.h\"\n"
   code.add "#include \"uintN_t.h\"\n"
+  code.add "#include \"float_e_m_t.h\"\n"
   code.add "#endif\n"
   code.add "#define uint8_t_c uint8_t\n"
   code.add "#define int8_t_c int8_t\n"
