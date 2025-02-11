@@ -11,8 +11,8 @@ import NimToPipelineC
 type
   Vec3[T] = object
     x*: T
-    y*: T
-    z*: T
+    y*, z*: T
+    #z*: T
 proc plus[T](
   left: Vec3[T],
   right: Vec3[T]
@@ -31,10 +31,16 @@ proc plus[T](
 #  result = (plus[T](left, right))
 
 type
+  Vec2I = object
+    x*: int
+    y*: int
+
+type
   Asdf[T] = object
     a*: int
     v*: Vec3[T]
     b*: array[2, int]
+    vi: Vec2I
 #var
 #  a: Asdf
 #  b = Asdf(a: 3)
@@ -53,6 +59,7 @@ proc doAsdf[T, U](
   )
   var tempVec3: Vec3[T]
   var tempVec3b: Vec3[T] = tempVec3.plus temp.v
+  var tempVec3c: Vec3[Asdf[T]]
   #var g: Vec3(int)
   #const
   #  eSize2dX = 8

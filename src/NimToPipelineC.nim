@@ -110,7 +110,7 @@ type
     #renameLevel: int = 0
     funcTbl: Table[string, string]
     funcSeq: seq[string]
-    typedefTbl: Table[string, seq[string]]
+    typedefTbl: Table[string, string]
     typedefSeq: seq[string]
     res: string
     useResult: bool
@@ -154,8 +154,9 @@ proc toCodeExprInner(
   inHaveArray: bool=false,
   #stickyInHaveArray: bool=false
   #varName: ref string=nil,
-  arrayPass: int=(-1)
+  arrayPass: int=(-1),
   #hadArray: ref bool=nil,
+  typeName: string="",
 ): string
 
 #proc nextProcRenameTbl(
@@ -219,9 +220,9 @@ proc toCodeIfStmt(
         self.res.add "else "
       else:
         first = false
-      self.res.add "if ("
+      self.res.add "if "
       self.toCodeExpr(n[0], level, false)
-      self.res.add ") {\n"
+      self.res.add " {\n"
 
       addIndent(self.res, level)
       self.toCodeStmts(n[1], level)
@@ -320,11 +321,52 @@ proc toCodeExprInner(
   #varName: ref string=nil,
   arrayPass: int=(-1),
   #hadArray: ref bool=nil,
+  typeName: string="",
 ): string =
   var n = nodes
   #echo n.kind
   self.hadArray = false
   if isTypeInst:
+    #echo n.getTypeInst().treeRepr
+    #if typeImpl != nil:
+    #  if typeImpl.kind == nnkObjectTy:
+    if typeName.len == 0:
+      let tempTypeImpl = n.getTypeImpl()
+      let tempTypeInst = n.getTypeInst()
+      #echo "tempTypeImpl:"
+      #echo tempTypeImpl.treeRepr
+      #echo ""
+      #echo "tempTypeInst:"
+      #echo tempTypeInst.treeRepr
+      #echo "--------"
+      if tempTypeImpl.kind == nnkObjectTy:
+        #echo "found nnkObjectTy"
+        #echo tempTypeInst.treeRepr
+        #echo ""
+        #echo n.treeRepr
+        let myTypeName = self.toCodeExprInner(
+          nodes=tempTypeInst,
+          level=level,
+          isLhs=isLhs,
+          isTypeInst=isTypeInst,
+          isSingle=isSingle,
+          typeImpl=nil,
+          inHaveArray=false,
+          arrayPass=arrayPass,
+          typeName="make-it-longer-than-zero-chars",
+        )
+        #echo "myTypeName: ", myTypeName
+        discard self.toCodeExprInner(
+          nodes=tempTypeImpl,
+          level=level,
+          isLhs=isLhs,
+          isTypeInst=isTypeInst,
+          isSingle=isSingle,
+          typeImpl=nil,
+          inHaveArray=false,
+          arrayPass=arrayPass,
+          typeName=myTypeName
+        )
     proc innerHandleIdentSym(
       someN: NimNode,
       someTypeImpl: NimNode=nil,
@@ -363,42 +405,44 @@ proc toCodeExprInner(
     #of nnkSym:
     #  result.add n.strVal
     of nnkBracketExpr:
-      echo "typeinst nnkBracketExpr: "
-      echo n.treeRepr
+      #echo "typeinst nnkBracketExpr: "
+      #echo n.treeRepr
       let innerTypeImpl = n.getTypeImpl()
-      echo innerTypeImpl.treeRepr
+      #echo innerTypeImpl.treeRepr
       let innerTypeInst = n.getTypeInst()
-      echo innerTypeInst.treeRepr
+      #echo innerTypeInst.treeRepr
+      #if innerTypeInst.kind == nnkObjectTy:
+      #  discard
       proc getHaveArray(
         someN: NimNode
       ): bool =
-        echo "getHaveArray: begin"
+        #echo "getHaveArray: begin"
         var haveArray: bool = (
           have(someN, @[nnkSym, nnkInfix])
         )
         if haveArray:
-          echo "getHaveArray: first"
+          #echo "getHaveArray: first"
           haveArray = (
             someN[0].strVal == "array"
           )
         if haveArray:
-          echo "getHaveArray: second"
+          #echo "getHaveArray: second"
           haveArray = (
             someN[1].len == 3
           )
         if haveArray:
-          echo "getHaveArray: third"
+          #echo "getHaveArray: third"
           haveArray = (
             have(someN[1], @[nnkIdent, nnkIntLit, nnkIntLit])
           )
         if haveArray:
-          echo "getHaveArray: fourth"
+          #echo "getHaveArray: fourth"
           haveArray = (
             someN[1][0].strVal == ".."
           )
         result = haveArray
       let tempHadArray = getHaveArray(someN=n)
-      echo "tempHadArray 0: ", tempHadArray
+      #echo "tempHadArray 0: ", tempHadArray
       self.hadArray = tempHadArray
       #if hadArray != nil:
       #  #echo "hadArray:" & $hadArray[]
@@ -407,7 +451,7 @@ proc toCodeExprInner(
       if tempHadArray:
         if inHaveArray:
           fail()
-        echo "getHaveArray(someN=n) == true:"
+        #echo "getHaveArray(someN=n) == true:"
         proc handleArray(
           self: var Convert,
           nodes: NimNode,
@@ -475,8 +519,8 @@ proc toCodeExprInner(
         )
         if mySeq.len > 1:
           if arrayPass == 0:
-            echo "arrayPass == 0:"
-            echo mySeq
+            #echo "arrayPass == 0:"
+            #echo mySeq
             result.add mySeq[^1]
             #result.add " "
             #result.add self.toCodeExprInner(
@@ -501,8 +545,8 @@ proc toCodeExprInner(
         case n[0].kind:
         of nnkIdent, nnkSym:
           if typeImpl != nil:
-            echo "n[0].kind == nnkIdent, nnkSym"
-            echo typeImpl[0].treeRepr
+            #echo "n[0].kind == nnkIdent, nnkSym"
+            #echo typeImpl[0].treeRepr
             result.add innerHandleIdentSym(
               someN=n[0],
               someTypeImpl=typeImpl[0],
@@ -520,8 +564,8 @@ proc toCodeExprInner(
         case n[1].kind:
         of nnkIdent, nnkSym:
           if typeImpl != nil:
-            echo "n[1].kind == nnkIdent, nnkSym"
-            echo typeImpl[1].treeRepr
+            #echo "n[1].kind == nnkIdent, nnkSym"
+            #echo typeImpl[1].treeRepr
             result.add innerHandleIdentSym(
               someN=n[1],
               someTypeImpl=typeImpl[1],
@@ -586,23 +630,61 @@ proc toCodeExprInner(
         #echo n.treeRepr
         fail()
     of nnkObjectTy:
-      echo "typeinst have nnkObjectTy:"
-      echo n.treeRepr
+      #echo "typeinst have nnkObjectTy:"
+      #echo "typeName: ", typeName
+      #echo n.treeRepr
+      #echo n.getTypeInst()
       #discard
-      fail()
+      #fail()
+      var toAdd: string
+      toAdd.add "typedef struct "
+      toAdd.add typeName
+      toAdd.add " {\n"
+      for memberDef in n[2]:
+        self.hadArray = false
+        toAdd.addIndent(level + 1)
+        var tempToAdd: string
+        tempToAdd = self.toCodeExprInner(
+          memberDef[1].getTypeInst(),
+          level, isLhs=false, isTypeInst=true, arrayPass=0,
+          #hadArray=hadArray
+        )
+        toAdd.add tempToAdd
+        let temp = self.hadArray
+        toAdd.add " "
+        tempToAdd = self.toCodeExprInner(
+          memberDef[0], level, isLhs=true
+        )
+        toAdd.add tempToAdd
+        if temp:
+          #echo "past self.hadArray:"
+          toAdd.add self.toCodeExprInner(
+            memberDef[1].getTypeInst(),
+            level, isLhs=false, isTypeInst=true, arrayPass=1,
+          )
+        toAdd.add ";\n"
+      toAdd.add "} "
+      toAdd.add typeName
+      toAdd.add ";\n"
+      if typeName notin self.typedefTbl:
+        #echo "notin test:"
+        #echo toAdd
+        self.typedefSeq.add toAdd
+        self.typedefTbl[typeName] = ""
+      #echo result
     of nnkEmpty:
       discard
     else:
-      echo "typeinst nnkOther:"
-      echo n.treeRepr
+      #echo "typeinst nnkOther:"
+      #echo n.treeRepr
       fail()
 
     return result
 
   case n.kind:
   of nnkIdent, nnkSym:
-    echo "is this \"t\"?"
-    echo n.strVal
+    #echo "is this \"t\"?"
+    #echo n.strVal
     result.add n.strVal
   of nnkInfix:
     if n[0].repr in ["+=", "-=", "*=", "/="]:
@@ -851,27 +933,27 @@ proc toCodeAsgn(
 #) =
 #  addIndent(self.res, level)
 
-proc typeDef(
-  self: var Convert,
-  topLevelNode: NimNode,
-  level: int,
-): string =
-  #var typeName = ""
-
-  #assert topLevelNode.kind in {nnkTypeDef}
-  let n = topLevelNode
-  result.add "typedef struct "
-  result.add self.toCodeExprInner(n[0], level, true)
-  result.add " {\n"
-  if have(n, @[nnkEmpty, nnkObjectTy], 1):
-    discard
-  else:
-    fail()
-  result.add "} "
-  result.add self.toCodeExprInner(n[0], level, true)
-  result.add ";\n"
-
-  #result = typeName
+#proc typeDef(
+#  self: var Convert,
+#  topLevelNode: NimNode,
+#  level: int,
+#): string =
+#  #var typeName = ""
+#
+#  #assert topLevelNode.kind in {nnkTypeDef}
+#  let n = topLevelNode
+#  result.add "typedef struct "
+#  result.add self.toCodeExprInner(n[0], level, true)
+#  result.add " {\n"
+#  if have(n, @[nnkEmpty, nnkObjectTy], 1):
+#    discard
+#  else:
+#    fail()
+#  result.add "} "
+#  result.add self.toCodeExprInner(n[0], level, true)
+#  result.add ";\n"
+#
+#  #result = typeName
 
 proc toCodeTypeSection(
   self: var Convert,
@@ -879,17 +961,18 @@ proc toCodeTypeSection(
   #res: var string,
   level = 0,
 ) =
+  discard
   #echo nodes.kind
-  addIndent(self.res, level)
-  let n = nodes
-  #for n in nodes:
-  case n.kind:
-  of nnkTypeDef:
-    # `n[0]` should be the `nnkIdent` or `nnkSym`
-    echo "in toCodeTypeSection:"
-    echo n.len
-  else:
-    fail()
+  #addIndent(self.res, level)
+  #let n = nodes
+  ##for n in nodes:
+  #case n.kind:
+  #of nnkTypeDef:
+  #  # `n[0]` should be the `nnkIdent` or `nnkSym`
+  #  echo "in toCodeTypeSection:"
+  #  echo n.len
+  #else:
+  #  fail()
 
 #proc toCodeTypeInst(
 #  self: var Convert,
@@ -942,9 +1025,9 @@ proc toCodeVarSection(
         #echo "#----"
         #echo "not an array?"
         #echo n.repr
-        echo "in nnkVarSection:"
-        echo n.treeRepr
-        echo n[0].treeRepr
+        #echo "in nnkVarSection:"
+        #echo n.treeRepr
+        #echo n[0].treeRepr
         #echo "----"
 
         #var hadArray: ref bool = new bool
@@ -956,7 +1039,7 @@ proc toCodeVarSection(
           level, isLhs=false, isTypeInst=true, arrayPass=0,
           #hadArray=hadArray
         )
-        echo "tempToAdd: " & tempToAdd
+        #echo "tempToAdd: " & tempToAdd
         self.res.add tempToAdd
         #echo "not eek: ", self.hadArray
         #echo "not eek: "
@@ -1390,11 +1473,11 @@ proc findTopLevel(
 
       case n[0].kind:
       of nnkIdent:
-        echo "findTopLevel(): nnkIdent"
-        echo repr(n)
+        #echo "findTopLevel(): nnkIdent"
+        #echo repr(n)
         #echo n[0]
-        echo n.treeRepr
-        echo "test in findTopLevel()"
+        #echo n.treeRepr
+        #echo "test in findTopLevel()"
         fail() # can't have 
       of nnkSym:
         #echo "#--------"
@@ -1489,9 +1572,18 @@ proc toPipelineCInner*(
   ##  code.add(v)
   ##  code.add "\n"
 
+  #for v in convert.typedefSeq[^1 .. 0]:
+  #  code.add(v)
+  #  code.add "\n"
+  #var i = convert.typedefSeq.len() - 1
+  #while i >= 0:
+  #for i in convert.typedefSeq.len() - 1 .. 0:
   for v in convert.typedefSeq:
-    code.add(v)
+    #echo "convert test"
+    #code.add convert.typedefSeq[i]
+    code.add v
     code.add "\n"
+    #i -= 1
   code.add "\n"
 
   for v in convert.funcSeq:
