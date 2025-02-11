@@ -151,6 +151,29 @@ proc toCodeIfStmt(
       self.res.add "}\n"
     else:
       fail()
+proc toCodeWhileStmt(
+  self: var Convert,
+  nodes: NimNode,
+  level = 0
+) =
+  let n = nodes
+  self.res.addIndent(level)
+  self.res.add "while "
+  self.toCodeExpr(
+    nodes=n[0],
+    level=level,
+    isLhs=false,
+    isTypeInst=false,
+  )
+  self.res.add " {\n"
+  for innerN in n[1 .. ^1]:
+    self.toCodeStmts(
+      nodes=innerN,
+      level=level,
+    )
+  self.res.addIndent(level)
+  self.res.add "}\n"
+  
 proc toCodeForStmt(
   self: var Convert,
   nodes: NimNode,
@@ -1327,6 +1350,8 @@ proc toCodeStmts(
     of nnkIfStmt:
       self.toCodeIfStmt(n, level + 1)
       #discard
+    of nnkWhileStmt:
+      self.toCodeWhileStmt(n, level + 1)
     of nnkForStmt:
       #echo "doing toCodeForStmt():"
       self.toCodeForStmt(n, level + 1)

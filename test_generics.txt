@@ -1,0 +1,105 @@
+StmtList
+  TypeSection
+    TypeDef
+      Ident "Vec2"
+      GenericParams
+        IdentDefs
+          Ident "XT"
+          Ident "YT"
+          Empty
+          Empty
+      ObjectTy
+        Empty
+        Empty
+        RecList
+          IdentDefs
+            Postfix
+              Ident "*"
+              Ident "x"
+            Ident "XT"
+            Empty
+          IdentDefs
+            Postfix
+              Ident "*"
+              Ident "y"
+            Ident "YT"
+            Empty
+  ProcDef
+    Ident "plus"
+    Empty
+    GenericParams
+      IdentDefs
+        Ident "XT"
+        Ident "YT"
+        Empty
+        Empty
+    FormalParams
+      BracketExpr
+        Ident "Vec2"
+        Ident "XT"
+        Ident "YT"
+      IdentDefs
+        Ident "left"
+        BracketExpr
+          Ident "Vec2"
+          Ident "XT"
+          Ident "YT"
+        Empty
+      IdentDefs
+        Ident "right"
+        BracketExpr
+          Ident "Vec2"
+          Ident "XT"
+          Ident "YT"
+        Empty
+    Empty
+    Empty
+    StmtList
+      ObjConstr
+        BracketExpr
+          Ident "Vec2"
+          Ident "XT"
+          Ident "YT"
+        ExprColonExpr
+          Ident "x"
+          Infix
+            Ident "+"
+            DotExpr
+              Ident "left"
+              Ident "x"
+            DotExpr
+              Ident "right"
+              Ident "x"
+        ExprColonExpr
+          Ident "y"
+          Infix
+            Ident "+"
+            DotExpr
+              Ident "left"
+              Ident "y"
+            DotExpr
+              Ident "right"
+              Ident "y"
+  TemplateDef
+    AccQuoted
+      Ident "+"
+    Empty
+    Empty
+    FormalParams
+      Ident "untyped"
+      IdentDefs
+        Ident "left"
+        Ident "Vec2"
+        Empty
+      IdentDefs
+        Ident "right"
+        Ident "Vec2"
+        Empty
+    Empty
+    Empty
+    StmtList
+      Command
+        DotExpr
+          Ident "left"
+          Ident "plus"
+        Ident "right"

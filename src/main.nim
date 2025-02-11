@@ -70,8 +70,11 @@ proc `plus`*[T](
   right: Vec3[T],
 ): Vec3[T] =
   # example 1:
-  for i in 0 ..< result.v.len():
+  var i: int = 0
+  #for i in 0 ..< result.v.len():
+  while i < result.v.len():
     result[i] = left[i] + right[i]
+    i = i + 1
 
   ## example 2:
   #result.x = left.x + right.x
