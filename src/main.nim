@@ -1,6 +1,6 @@
 #import std/macros
-include ExtraMacros
-import NimToPipelineC
+include extraMacros
+import nimToPipelineC
 #include Vec3Macros
 
 #dumpTree:
@@ -46,6 +46,10 @@ type
 #  b = Asdf(a: 3)
 #var c: Asdf = Asdf(a: b.a)
 #var e: array[8, int]
+#macro size[I, T](
+#  someArray: array[I, T]
+#): untyped =
+#  I
 
 proc doAsdf[T, U](
   asdf: Asdf[T],
@@ -57,32 +61,39 @@ proc doAsdf[T, U](
     v: Vec3[T](x:0, y:1, z:2),
     #b: [1, 2]
   )
-  var tempVec3: Vec3[T]
-  var tempVec3b: Vec3[T] = tempVec3.plus temp.v
-  var tempVec3c: Vec3[Asdf[T]]
+  #var tempVec3: Vec3[T]
+  #var tempVec3b: Vec3[T] = tempVec3.plus temp.v
+  #var tempVec3c: Vec3[Asdf[T]]
   #var g: Vec3(int)
   #const
   #  eSize2dX = 8
   #  eSize2dY = 3
   var e: array[3, array[8, Vec3[Asdf[T]]]]
   ##var e: array[3, array[8, Vec3[int]]]
-  if e[0][0].x.v.x == 0:
-    e[1][1].x.a = 9
-    if e[1][1].y.a == 7:
-      e[0][0].x.v.z = 200
-  elif e[0][0].x.v.y == 0:
-    e[0][0].x.v.z = 8
-  else:
-    e[2][2].x.a = 7
+  #if e[0][0].x.v.x == 0:
+  #  e[1][1].x.a = 9
+  #  if e[1][1].y.a == 7:
+  #    e[0][0].x.v.z = 200
+  #elif e[0][0].x.v.y == 0:
+  #  e[0][0].x.v.z = 8
+  #else:
+  #  e[2][2].x.a = 7
+  #for j in 0 ..< e.len:
+  #  for i in 0 ..< e[j].len:
+  #    e[j][i].x.v.x = e[j][i].x.v.x + 1
   #var f: array[3, array[8, Vec3[int]]]
-  var f: array[3, array[8, int]]
+  #var f: array[3, array[8, int]]
   result = e[temp.a][(temp.a) + 1].x
   #result = temp
 
 #doTypedefVec3(int)
+type
+  MyArray[T] = object
+    e: array[2, Vec3[Asdf[T]]]
 
 proc myMain[T](
-  e: Vec3[Asdf[T]]
+  #e: array[2, Vec3[Asdf[T]]]
+  e: MyArray[T]
 ): Asdf[T] =
   var a: Asdf[T]
   var c: Asdf[T]
@@ -94,10 +105,10 @@ proc myMain[T](
   b = doAsdf[T, float](a, 9)
   #var d = doAsdf(asdf=c, b=8)
   #a.a = 9
-  #var arr: array[2, array[3, Vec3(T)]]
-  #for j in 0 ..< arr.len:
-  #  for i in 0 ..< arr[j].len:
-  #    arr[j][i].x = arr[j][i].x + 1
+  var arr: array[2, array[3, Vec3[T]]]
+  for j in 0 ..< arr.len:
+    for i in 0 ..< arr[j].len:
+      arr[j][i].x = arr[j][i].x + 1
   #type
   #  TriVert = object
   #    v0: Vec3(T)
@@ -106,14 +117,15 @@ proc myMain[T](
   #var a: TriVert
   result = b
 #myMain()
-proc myMain2[T](
-  a, c: Vec3[Asdf[T]],
-  b: Asdf[int16],
-): int =
-  result = 3
+#proc myMain2[T](
+#  a, c: Vec3[Asdf[T]],
+#  b: Asdf[int16],
+#): int =
+#  result = 3
 proc myOuterMain(): int =
   #var e: Asdf[int]
-  var e: Vec3[Asdf[int]]
+  #var e: array[2, Vec3[Asdf[int]]]
+  var e: MyArray[int]
   var t: array[8, Asdf[float]]
   result = myMain[int](
     e=e
@@ -129,7 +141,10 @@ proc myOuterOuterMain(): int =
   result = myOuterMain()
 #let temp = 
 #echo toPipelineC(bindSym("myOuterOuterMain"))
+#echo toPipelineC(myOuterOuterMain)
+#var temp = 
 echo toPipelineC(myOuterOuterMain)
+#echo temp
 
 
 #var a = Vec3(int)(x:9, y: 8, z: 7)

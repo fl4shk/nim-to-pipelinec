@@ -1,5 +1,5 @@
 import std/macros
-import ExtraMacros
+import extraMacros
 
 macro `doTypedefVec3`*(
   T: untyped
