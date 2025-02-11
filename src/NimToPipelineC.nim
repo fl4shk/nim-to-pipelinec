@@ -114,6 +114,7 @@ type
     typedefSeq: seq[string]
     res: string
     useResult: bool
+    hadArray: bool
 
 macro fail(): untyped =
   result = quote do:
@@ -153,8 +154,8 @@ proc toCodeExprInner(
   inHaveArray: bool=false,
   #stickyInHaveArray: bool=false
   #varName: ref string=nil,
-  arrayPass: int=0,
-  hadArray: ptr bool=nil,
+  arrayPass: int=(-1)
+  #hadArray: ref bool=nil,
 ): string
 
 #proc nextProcRenameTbl(
@@ -291,13 +292,14 @@ proc funcRenameIter(
     isSingle=true,
     #typeImpl=paramType,
   )
-  if first:
-    first = false
-    #procName.add "_f"
-    procName.add "_"
-  else:
-    #procName.add "_c"
-    procName.add "_"
+  #if first:
+  #  first = false
+  #  procName.add "_f"
+  #  #procName.add "_"
+  #else:
+  #  #discard
+  procName.add "_c"
+    #procName.add "_"
   procName.add result
   #echo "funcRenameIter: " & procName
   #paramsStr.add tempParamsStr
@@ -316,11 +318,12 @@ proc toCodeExprInner(
   inHaveArray: bool=false,
   #stickyInHaveArray: bool=false
   #varName: ref string=nil,
-  arrayPass: int=0,
-  hadArray: ptr bool=nil,
+  arrayPass: int=(-1),
+  #hadArray: ref bool=nil,
 ): string =
   var n = nodes
   #echo n.kind
+  self.hadArray = false
   if isTypeInst:
     proc innerHandleIdentSym(
       someN: NimNode,
@@ -329,23 +332,24 @@ proc toCodeExprInner(
       var tempStr: (bool, string) = typeRenameInner(someN.strVal)
       if someN.kind == nnkIdent:
         if someTypeImpl != nil:
-          echo "have nnkIdent with typeImpl:"
-          echo tempStr[1]
-          echo someTypeImpl.treeRepr
+          #echo "have nnkIdent with typeImpl:"
+          #echo tempStr[1]
+          #echo someTypeImpl.treeRepr
           #tempStr[1] = someType
+          discard
         #echo someN.getType()
         #echo someN.astGenRepr()
         #echo someN.getImpl()
         #echo someN.getTypeInst()
       #result.add someN.strVal
       if not tempStr[0]:
-        #result.add tempStr[1].replace("_", "_a")
-        result.add tempStr[1]#.replace("_", "_a")
+        result.add tempStr[1].replace("_", "_a")
+        #result.add tempStr[1]#.replace("_", "_a")
       else:
         result.add tempStr[1]
-      if not isSingle:
-        #result.add "_c"
-        result.add "_"
+      #if not isSingle:
+      result.add "_c"
+        #result.add "_"
 
     #echo "isTypeInst: " & repr(n)
     case n.kind:
@@ -361,32 +365,43 @@ proc toCodeExprInner(
     of nnkBracketExpr:
       echo "typeinst nnkBracketExpr: "
       echo n.treeRepr
-      #let innerTypeImpl = n.getTypeInst()
-      #echo innerTypeImpl.treeRepr
+      let innerTypeImpl = n.getTypeInst()
+      echo innerTypeImpl.treeRepr
       proc getHaveArray(
         someN: NimNode
       ): bool =
+        echo "getHaveArray: begin"
         var haveArray: bool = (
           have(someN, @[nnkSym, nnkInfix])
         )
         if haveArray:
+          echo "getHaveArray: first"
           haveArray = (
             someN[0].strVal == "array"
           )
         if haveArray:
+          echo "getHaveArray: second"
           haveArray = (
             someN[1].len == 3
           )
         if haveArray:
+          echo "getHaveArray: third"
           haveArray = (
             have(someN[1], @[nnkIdent, nnkIntLit, nnkIntLit])
           )
         if haveArray:
+          echo "getHaveArray: fourth"
           haveArray = (
             someN[1][0].strVal == ".."
           )
         result = haveArray
       let tempHadArray = getHaveArray(someN=n)
+      echo "tempHadArray 0: ", tempHadArray
+      self.hadArray = tempHadArray
+      #if hadArray != nil:
+      #  #echo "hadArray:" & $hadArray[]
+      #  hadArray[] = tempHadArray
+      #  echo "tempHadArray: ", tempHadArray
       if tempHadArray:
         if inHaveArray:
           fail()
@@ -404,9 +419,10 @@ proc toCodeExprInner(
             ret: var seq[string],
             level: int,
           ) =
-            echo "doLastIter():"
-            echo nodes.treeRepr
-            echo "--------"
+            if arrayPass == 0:
+              echo "doLastIter():"
+              echo nodes.treeRepr
+              echo "--------"
             ret.add self.toCodeExprInner(
               nodes=nodes,
               level=level,
@@ -420,7 +436,8 @@ proc toCodeExprInner(
           case n.kind:
           of nnkBracketExpr:
             if getHaveArray(someN=n):
-              echo "nnkBracketExpr getHaveArray:"
+              if arrayPass == 0:
+                echo "nnkBracketExpr getHaveArray:"
               ret.add $(n[1][2].intVal - n[1][1].intVal + 1)
               self.handleArray(
                 nodes=n[2],
@@ -428,18 +445,20 @@ proc toCodeExprInner(
                 level=level,
               )
             else:
-              echo "nnkBracketExpr not getHaveArray:"
-              echo n.treeRepr
-              echo "--------"
+              if arrayPass == 0:
+                echo "nnkBracketExpr not getHaveArray:"
+                echo n.treeRepr
+                echo "--------"
               self.doLastIter(
                 nodes=n,
                 ret=ret,
                 level=level,
               )
           else:
-            echo "not nnkBracketExpr getHaveArray:"
-            echo n.treeRepr
-            echo "--------"
+            if arrayPass == 0:
+              echo "not nnkBracketExpr getHaveArray:"
+              echo n.treeRepr
+              echo "--------"
             self.doLastIter(
               nodes=n,
               ret=ret,
@@ -463,11 +482,14 @@ proc toCodeExprInner(
               isTypeInst=false,
               inHaveArray=true,
             )
-          else:
+            self.hadArray = true
+          elif arrayPass == 1:
             for i in 0 ..< mySeq.len - 1:
               result.add "["
               result.add mySeq[i]
               result.add "]"
+          else:
+            fail()
         else:
           fail()
       else: # if not haveArray
@@ -536,7 +558,7 @@ proc toCodeExprInner(
           echo "n[0].kind == nnkOpenSymChoice: first:"
           result.add self.toCodeExprInner(
             innerTypeInst, level, isLhs, isTypeInst, isSingle,
-            innerTypeImpl
+            innerTypeImpl, arrayPass=arrayPass
           )
           #result.add "_b"
           #var idx = 2
@@ -559,7 +581,10 @@ proc toCodeExprInner(
         #echo n.treeRepr
         fail()
     of nnkObjectTy:
-      discard
+      echo "typeinst have nnkObjectTy:"
+      echo n.treeRepr
+      #discard
+      fail()
     of nnkEmpty:
       discard
     else:
@@ -691,19 +716,19 @@ proc toCodeExprInner(
         result.add "})"
       of nnkCall:
         var procName: string = n[0].strVal #& "_f"
-        echo "expr nnkCall: " # & procName
-        echo n.treeRepr
-        echo n[0].getTypeInst().treeRepr
+        #echo "expr nnkCall: " # & procName
+        #echo n.treeRepr
+        #echo n[0].getTypeInst().treeRepr
         var first: bool = true
         #if 
-        echo "pre for loop"
+        #echo "pre for loop"
         for i in 1 ..< n.len:
           #--------
           #--------
           #echo n[i].treeRepr
           var paramType: NimNode
-          echo "tempificate:"
-          echo "n[i].kind: " & $n[i].kind & " " & $i
+          #echo "tempificate:"
+          #echo "n[i].kind: " & $n[i].kind & " " & $i
           case n[i].kind:
           of nnkExprEqExpr:
             #echo n[i][1].getTypeInst()
@@ -718,14 +743,14 @@ proc toCodeExprInner(
             let n = paramType
             fail()
           else:
-            echo "doing rename: "
+            #echo "doing rename: "
             discard self.funcRenameIter(
               paramType=paramType,
               procName=procName,
               first=first,
             )
-            echo paramType.treeRepr
-        echo "post for loop"
+            #echo paramType.treeRepr
+        #echo "post for loop"
 
         #echo "#--------"
         #echo "expr nnkCall: " & procName
@@ -906,22 +931,28 @@ proc toCodeVarSection(
         #    )
         #  )
         #):
-        #echo "#----"
+        echo "#----"
         #echo "not an array?"
         #echo n.repr
-        #echo n.treeRepr
-        #echo "----"
+        echo "in nnkVarSection:"
+        echo n.treeRepr
+        echo "----"
 
-        var hadArray: bool = false
+        #var hadArray: ref bool = new bool
+        #hadArray[] = false
         self.res.add self.toCodeExprInner(
           n[1], level, isLhs=false, isTypeInst=true, arrayPass=0,
-          hadArray=addr hadArray
+          #hadArray=hadArray
         )
+        echo "not eek: ", self.hadArray
+        let temp = self.hadArray
         self.res.add " "
         self.res.add self.toCodeExprInner(
           n[0], level, isLhs=true
         )
-        if hadArray:
+        echo "post n[0]"
+        if temp:
+          echo "past self.hadArray:"
           self.res.add self.toCodeExprInner(
             n[1], level, isLhs=false, isTypeInst=true, arrayPass=1,
           )
@@ -934,8 +965,8 @@ proc toCodeVarSection(
       #  else:
       #    fail()
       else:
-        echo "my-fail-notes:"
-        echo n.treeRepr
+        #echo "my-fail-notes:"
+        #echo n.treeRepr
         fail()
       #of (nnkIdent, nnkIdent, nnkEmpty):
       #  discard
@@ -1089,21 +1120,21 @@ proc procDef(
   assert typeImpl.kind in {
     nnkProcTy
   }
-  echo "#----"
-  echo "procDef(): start:"
-  echo procNode.kind
-  echo procNode.treeRepr
-  echo ""
-  echo typeImpl.kind
-  echo typeImpl.treeRepr
-  echo "----"
+  #echo "#----"
+  #echo "procDef(): start:"
+  #echo procNode.kind
+  #echo procNode.treeRepr
+  #echo ""
+  #echo typeImpl.kind
+  #echo typeImpl.treeRepr
+  #echo "----"
   for n in procNode:
     #echo n.kind
     #echo n.treeRepr
     #echo "----"
-    echo "for loop begin:"
-    echo procName
-    echo "--------"
+    #echo "for loop begin:"
+    #echo procName
+    #echo "--------"
     case n.kind:
     of nnkEmpty:
       discard
@@ -1153,7 +1184,7 @@ proc procDef(
     of nnkFormalParams:
       if n[0].kind != nnkEmpty:
         #returnType = n[0].strVal
-        echo "returnType:"
+        #echo "returnType:"
         #echo n.treeRepr
         #echo ""
         #echo n[0].treeRepr
@@ -1166,25 +1197,25 @@ proc procDef(
           isLhs=false,
           isTypeInst=true,
         )
-        echo returnType
-        echo "--------"
+        #echo returnType
+        #echo "--------"
       var idx = 1
       for paramDef in n[1 .. ^1]:
         # the paramDef is like `x, y, z: float`
-        echo "paramDef:"
-        echo paramDef.treeRepr
+        #echo "paramDef:"
+        #echo paramDef.treeRepr
         var first: bool = true
         if paramDef.kind != nnkEmpty:
           for param in paramDef[0 ..< ^2]:
           #for otherIdx in 0 ..< paramDef[0 ..< ^2].len:
             #let param = paramDef[otherIdx]
-            echo "param stuff:"
-            echo param.treeRepr
+            #echo "param stuff:"
+            #echo param.treeRepr
             #echo "the length: ", paramDef[0 ..< ^2].len()
             # Process each `x`, `y`, `z` in a loop
             paramsStr.add "  "
             let paramName = param.repr()
-            echo "here's the paramName: ", paramName
+            #echo "here's the paramName: ", paramName
             #let paramType = param.getTypeInst()
             #let paramTypeImpl = param.getTypeImpl()
             #echo "#--------"
@@ -1225,22 +1256,22 @@ proc procDef(
             #procName.add tempParamsStr
             #paramsStr.add tempParamsStr
             #echo "procName: " & procName
-            echo "paramsStr.add: "
-            echo typeImpl[0][idx].treeRepr
+            #echo "paramsStr.add: "
+            #echo typeImpl[0][idx].treeRepr
             #echo ""
             #echo typeImpl[0][idx].treeRepr
             #echo "note:"
             #echo typeImpl[idx].treeRepr
             #echo "idx, otherIdx: " & $idx & " " & $otherIdx
-            echo typeImpl[0][idx].treeRepr
-            echo "kind: ", typeImpl[0][idx].kind
+            #echo typeImpl[0][idx].treeRepr
+            #echo "kind: ", typeImpl[0][idx].kind
             case typeImpl[0][idx].kind:
             of nnkIdentDefs:
-              echo "temp: "
+              #echo "temp: "
               #echo typeImpl[0][0][idx][1].treeRepr
               #echo typeImpl[0][idx].treeRepr
-              echo typeImpl[0][idx][1].treeRepr
-              echo "temp end:"
+              #echo typeImpl[0][idx][1].treeRepr
+              #echo "temp end:"
               paramsStr.add(
                 self.funcRenameIter(
                   paramType=(
@@ -1269,9 +1300,9 @@ proc procDef(
       #procName = procName & "_g" & returnType
       procName = procName & "_" & returnType
       result[0] = procName
-      echo "setting result[0]"
-      echo procName
-      echo "--------"
+      #echo "setting result[0]"
+      #echo procName
+      #echo "--------"
 
       self.res.add returnType & " " & procName  & "("
       #if result[0].len > 0:
@@ -1308,7 +1339,7 @@ proc procDef(
   #echo "test: "
   #result[0] = procName
   result[1] = self.res
-  echo result
+  #echo result
 
 
 proc findTopLevel(
@@ -1348,8 +1379,8 @@ proc findTopLevel(
         echo "test in findTopLevel()"
         fail() # can't have 
       of nnkSym:
-        echo "#--------"
-        echo "findTopLevel(): nnkSym"
+        #echo "#--------"
+        #echo "findTopLevel(): nnkSym"
         #echo n[0].kind
         #echo n[0].symKind()
         let impl = n[0].getImpl()
@@ -1357,19 +1388,19 @@ proc findTopLevel(
         let innerTypeInst = n[0].getTypeInst()
         let innerType = n[0].getType()
         ###echo repr(impl)
-        echo "impl.treeRepr:"
-        echo impl.treeRepr
-        echo ""
-        echo "innerTypeImpl.treeRepr:"
-        echo innerTypeImpl.treeRepr
-        echo ""
-        echo n[0].repr()
-        echo "innerTypeInst.treeRepr:"
-        echo innerTypeInst.treeRepr
-        echo ""
-        echo "innerType.treeRepr:"
-        echo innerType.treeRepr
-        echo "--------"
+        #echo "impl.treeRepr:"
+        #echo impl.treeRepr
+        #echo ""
+        #echo "innerTypeImpl.treeRepr:"
+        #echo innerTypeImpl.treeRepr
+        #echo ""
+        #echo n[0].repr()
+        #echo "innerTypeInst.treeRepr:"
+        #echo innerTypeInst.treeRepr
+        #echo ""
+        #echo "innerType.treeRepr:"
+        #echo innerType.treeRepr
+        #echo "--------"
         #self.nextProcRenameTbl(typeImpl)
         self.findTopLevel(
           impl#, innerTypeImpl
@@ -1394,8 +1425,8 @@ proc findTopLevel(
         #if self.procRenameTbl.len > 0:
         #  discard self.procRenameTbl.pop()
       else:
-        echo "test in findTopLevel() 1"
-        echo repr(n[0])
+        #echo "test in findTopLevel() 1"
+        #echo repr(n[0])
         discard
 
     self.findTopLevel(

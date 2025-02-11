@@ -32,6 +32,7 @@ type
   Asdf[T] = object
     a*: int
     v*: Vec3[T]
+    b*: array[2, int]
 #var
 #  a: Asdf
 #  b = Asdf(a: 3)
@@ -45,7 +46,8 @@ proc doAsdf[T, U](
   var temp: Asdf[T]
   temp = Asdf[T](
     a: asdf.a + b,
-    v: Vec3[T](x:0, y:1, z:2)
+    v: Vec3[T](x:0, y:1, z:2),
+    #b: [1, 2]
   )
   var tempVec3: Vec3[int]
   #var g: Vec3(int)
