@@ -22,11 +22,13 @@ proc plus[T](
     y: left.y + right.y,
     z: left.z + right.z,
   )
-proc `+`(
-  left: Vec3,
-  right: Vec3,
-): Vec3 =
-  result = (left.plus right)
+#proc `+`[
+#  T
+#](
+#  left: Vec3[T],
+#  right: Vec3[T],
+#): Vec3[T] =
+#  result = (plus[T](left, right))
 
 type
   Asdf[T] = object
@@ -49,7 +51,8 @@ proc doAsdf[T, U](
     v: Vec3[T](x:0, y:1, z:2),
     #b: [1, 2]
   )
-  var tempVec3: Vec3[int]
+  var tempVec3: Vec3[T]
+  var tempVec3b: Vec3[T] = tempVec3.plus temp.v
   #var g: Vec3(int)
   #const
   #  eSize2dX = 8
@@ -58,6 +61,8 @@ proc doAsdf[T, U](
   ##var e: array[3, array[8, Vec3[int]]]
   if e[0][0].x.v.x == 0:
     e[1][1].x.a = 9
+    if e[1][1].y.a == 7:
+      e[0][0].x.v.z = 200
   elif e[0][0].x.v.y == 0:
     e[0][0].x.v.z = 8
   else:
@@ -102,7 +107,7 @@ proc myMain2[T](
 proc myOuterMain(): int =
   #var e: Asdf[int]
   var e: Vec3[Asdf[int]]
-  var t: array[8, Asdf[int]]
+  var t: array[8, Asdf[float]]
   result = myMain[int](
     e=e
   ).a
