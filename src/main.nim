@@ -58,11 +58,11 @@ template `z=`*(
 proc mkVec3[T](
   x, y, z: T,
 ): Vec3[T] =
-  var temp: Vec3[T]
-  #result = Vec3[T](v: [x, y, z])
-  temp.x = x
-  temp.y = y
-  temp.z = z
+  var temp: Vec3[T] = Vec3[T](v: [x, y, z])
+  ##result = Vec3[T](v: [x, y, z])
+  #temp.x = x
+  #temp.y = y
+  #temp.z = z
   result = temp
 
 proc `plus`*[T](
@@ -84,6 +84,11 @@ template `+`*(
 ): Vec3 =
   left.plus right
 
+#proc doVec3IAdd(
+#  a: Vec3[int],
+#  b: Vec3[int],
+#): Vec3[int] {.importc: "doVec3IAdd".}
+
 
 proc doVec3IAdd(
   a: Vec3[int],
@@ -94,11 +99,21 @@ proc doVec3IAdd(
 #macro myPragmaStr(): untyped =
 #  result = quote do:
 #    "#pragma MAIN_MHZ myMain 100.0"
+#macro myMainPragmas(
+#  ResultT: untyped
+#): untyped =
+#  let tempStr = "300.0"
+#  result = quote do:
+
+# The FPGA of the Arty A7 100T
+macro part(): untyped =
+  result = quote do:
+    "#pragma PART \"xc7a100tcsg324-1\"\n" 
 
 proc myMain(
   a: Vec3[int],
   b: Vec3[int],
-): Vec3[int] =
+): Vec3[int] {.craw: part,cmainmhz: "300.0",cstatic.} =
   #{.craw: myPragmaStr.}
   #let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
   #let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)

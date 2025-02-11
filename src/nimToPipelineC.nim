@@ -10,6 +10,13 @@ template `craw`*(
   key: string
 ) {.pragma.}
 
+template `cmainmhz`*(
+  mhz: string
+) {.pragma.}
+
+#macro `cimport`*() =
+#  {.pragma: imported, importc, cdecl, raises: [], gcsafe.}
+
 type
   Convert = object
     #procRenameTbl: seq[Table[string, string]]
@@ -22,6 +29,7 @@ type
     res: string
     useResult: bool
     hadArray: bool
+    procName: string
 
 macro fail(): untyped =
   result = quote do:
@@ -1203,6 +1211,94 @@ proc toCodeVarSection(
     #echo n
     fail()
 
+proc toCodePragmaStmtInner(
+  self: var Convert,
+  nodes: NimNode,
+  level: int,
+  #procName: string,
+): string =
+  let n = nodes
+  #proc innerFunc(
+  #  self: var Convert,
+  #  nodes: NimNode,
+  #  level: int,
+  #): string =
+  #  let n = nodes
+  #  #if (
+  #  #  (
+  #  #    n.kind == nnkIdent
+  #  #  ) or (
+  #  #    n.kind == nnkSym
+  #  #  )
+  #  #):
+  #  case n.repr():
+  #  of "cstatic":
+  #    result.add "static"
+  #  of "craw":
+  #    #if n[0].repr() == "craw":
+  #    if (
+  #      (
+  #        n.kind != nnkIdent 
+  #      ) and (
+  #        n.kind != nnkSym
+  #      )
+  #    ):
+  #      result.add n[1].strVal
+  #  of "cmainmhz":
+  #    if (
+  #      (
+  #        n[0].kind != nnkIdent 
+  #      ) and (
+  #        n[0].kind != nnkSym
+  #      )
+  #    ):
+  #      result.add "#pragma MAIN_MHZ "
+  #      result.add self.procName
+  #      result.add " "
+  #      result.add n[1].strVal
+  #  of "importc":
+  #    discard
+  #  else:
+  #    fail()
+  for item in n.children:
+    #echo "item:"
+    #echo item.treeRepr
+    case item.kind:
+    of nnkIdent, nnkSym:
+      #result.add self.innerFunc(nodes=item, level=level)
+      case item.repr():
+      of "cstatic":
+        result.add "static"
+      else:
+        let n = item
+        fail()
+    of nnkExprColonExpr:
+      #result.add self.innerFunc(nodes=item[0], level=level)
+      case item[0].repr():
+      of "craw":
+        result.add item[1].strVal
+      of "cmainmhz":
+        result.add "#pragma MAIN_MHZ "
+        result.add self.procName
+        result.add " "
+        result.add item[1].strVal
+        result.add "\n"
+      of "importc":
+        discard
+      else:
+        let n = item
+        fail()
+    else:
+      discard
+proc toCodePragmaStmt(
+  self: var Convert,
+  nodes: NimNode,
+  level: int,
+  #procName: string,
+) =
+  self.res.add self.toCodePragmaStmtInner(
+    nodes=nodes, level=level, #procName=procName,
+  )
 proc toCodeStmts(
   self: var Convert,
   nodes: NimNode,
@@ -1227,10 +1323,7 @@ proc toCodeStmts(
     of nnkSym:
       discard
     of nnkPragma:
-      if n[0].kind == nnkExprColonExpr:
-        if have(n[0], @[nnkSym]):
-          if n[0][0].repr() == "craw":
-            self.res.add n[0][1].strVal
+      self.toCodePragmaStmt(nodes=n, level=level + 1)
     of nnkIfStmt:
       self.toCodeIfStmt(n, level + 1)
       #discard
@@ -1321,7 +1414,7 @@ proc procDef(
   #parentNode: NimNode,
   procNode: NimNode,
   typeImpl: NimNode,
-): (string, string) =
+): (string, string, bool) =
   var procName = ""
   var paramsStr = ""
   var returnType = "void"
@@ -1345,6 +1438,10 @@ proc procDef(
   #echo typeImpl.kind
   #echo typeImpl.treeRepr
   #echo "----"
+  #var myProcPragmaStr: string
+  var myProcPragmaSeq: seq[NimNode]
+
+  var foundElse: bool = false
   for n in procNode:
     #echo n.kind
     #echo n.treeRepr
@@ -1357,6 +1454,10 @@ proc procDef(
       discard
     of nnkPragma:
       # TODO: come back to this later
+      #myProcPragmaStr.add self.toCodePragmaStmtInner(
+      #  nodes=n, level=0, procName=#isProc=true
+      #)
+      myProcPragmaSeq.add n
       discard
     of nnkSym:
       procName = $n
@@ -1512,6 +1613,7 @@ proc procDef(
         paramsStr.add "\n"
     else:
       #echo "ending? " & procName
+      foundElse = true
       self.res.setLen(0)
       self.res.add "\n"
       procName = procName & "_g" & returnType
@@ -1521,7 +1623,7 @@ proc procDef(
       #echo procName
       #echo "--------"
 
-      self.res.add returnType & " " & procName  & "("
+      self.res.add returnType & " " & procName & "("
       #if result[0].len > 0:
       #  procName.add "_f" & result[0]
       #self.res.add "("
@@ -1536,6 +1638,7 @@ proc procDef(
         self.res.addIndent(1)
         self.res.add returnType
         self.res.add " result;"
+      self.procName = procName
       self.toCodeStmts(n, 0)
       if self.useResult:
         if "return result" notin self.res[^20..^1]:
@@ -1555,7 +1658,19 @@ proc procDef(
   #echo self.res
   #echo "test: "
   #result[0] = procName
-  result[1] = self.res
+  #if myProcPragmaStr.len() > 0:
+  #  result[1] = myProcPragmaStr
+  #  result[1].add " "
+  for procPragma in myProcPragmaSeq:
+    #echo "procPragma:"
+    #echo procPragma.treeRepr
+    result[1].add self.toCodePragmaStmtInner(
+      nodes=procPragma, level=0, #procName=#isProc=true
+    )
+
+  result[1].add self.res
+
+  result[2] = foundElse
   #echo result
 
 
@@ -1624,12 +1739,14 @@ proc findTopLevel(
           impl#, innerTypeImpl
         )
         let myProcDef = self.procDef(impl, innerTypeImpl)
-        #var innerProcName = myProcDef[0]
+        #let innerProcName = myProcDef[0]
         if (
           (
             myProcDef[0] in ignoreFuncs
           ) or (
             myProcDef[0] in self.funcTbl
+          ) or (
+            not myProcDef[2]
           )
         ):
           #echo "continuing 2:"
@@ -1704,10 +1821,12 @@ proc toPipelineCInner*(
   #for i in convert.typedefSeq.len() - 1 .. 0:
   code.add "#ifndef __PIPELINEC__\n"
   code.add "#include <stdint.h>\n"
+  code.add "#include <stdbool.h>\n"
   code.add "#else\n"
   code.add "#include \"intN_t.h\"\n"
   code.add "#include \"uintN_t.h\"\n"
   code.add "#include \"float_e_m_t.h\"\n"
+  code.add "#include \"bool.h\"\n"
   code.add "#endif\n"
   code.add "#define uint8_t_c uint8_t\n"
   code.add "#define int8_t_c int8_t\n"
