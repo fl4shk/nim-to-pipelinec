@@ -5,103 +5,10 @@ import borrowed
 
 {.experimental: "caseStmtMacros".}
 
-##macro cdecl*[T](
-##  name: untyped,
-##): untyped = 
-##  result = newStmtList()
-#
-#  #result = newStmtList()
-#  #for i in 0..<10:
-#  #  let name = ident("myProc" & $i)
-#  #  let content = newLit("I am procedure number #" & $i)
-#
-#  #  result.add quote do:
-#  #    proc `name`() =
-#  #      echo `content`
-#
-#template cif*(
-#  expr: untyped,
-#  stmtList: untyped
-#): untyped =
-#  let ret {.nodecl.} = expr
-#  {.emit:"if (".}
-#  {.emit:"ret".}
-#  {.emit:") {\n".}
-#  stmtList
-#  {.emit:"}\n".}
-#
-##macro cif*(
-##  expr: untyped,
-##  stmtList: untyped,
-##): untyped =
-##  stmtList.expectKind nnkStmtList
-##  let retName = ident("ret")
-##  result = quote do:
-##    {.emit:"if (".}
-##    #cexpr(expr=`expr`)
-##    #let temp {.nodecl.}: typeof(`expr`) = `expr`
-##    #discard temp
-##    #let `ret` = `expr`
-##    let `retName` {.importc,nodecl.} = `expr`
-##    #cexpr(expr=`expr`)
-##    {.emit:") {\n".}
-##    cstmtlist(stmtList=`stmtList`)
-##    {.emit:"}\n".}
-#
-#macro celif*(
-#  expr: untyped,
-#  stmtList: untyped,
-#): untyped =
-#  result = quote do:
-#    {.emit:"else if (".}
-#    cexpr(expr=`expr`)
-#    {.emit:") {\n".}
-#    cstmtlist(stmtList=`stmtList`)
-#    {.emit:"}\n".}
-#
-#macro celse*(
-#  stmtList: untyped
-#): untyped = 
-#  result = quote do:
-#    {.emit:"else {".}
-#    cstmtlist(stmtList=`stmtList`)
-#    {.emit:"}\n".}
-#
-#macro cstmtlist*(
-#  stmtList: untyped
-#): untyped =
-#  stmtList.expectKind nnkStmtList
-#
-##macro cexpr*(
-##  expr: untyped,
-##): untyped =
-##  result = quote do:
-##    {.emit:"" & $`expr`.}
-#template cexpr*(
-#  expr: untyped
-#): bool =
-#  let temp {.nodecl.}: typeof(expr) = expr
-#  temp
-#
-#
-##macro `eq`*(
-##  left: untyped,
-##  right: untyped
-##): untyped =
-##  discard
-#
-##cif(3):
-##  let a = 3
-##  let b = 8
-
-#type
-#  Rename = object
-#    typeName: string
-#    typeImpl: NimNode
-#macro asType(
-#  T: typedesc
-#): untyped =
-#  T
+template `cstatic`*() {.pragma.}
+template `craw`*(
+  key: string
+) {.pragma.}
 
 type
   Convert = object
@@ -680,6 +587,17 @@ proc toCodeExprInner(
         fail()
       else:
         result.add($tempIntVal)
+    of nnkInfix:
+      var valid: bool = true
+      if valid:
+        valid = have(n, @[nnkIdent, nnkIntLit, nnkIntLit])
+      if valid:
+        valid = n[0].repr() == ".."
+
+      if valid:
+        result.add $(n[2].intVal - n[1].intVal + 1)
+      else:
+        fail()
     of nnkCall:
       #echo "#--------"
       #echo "typeinst nnkCall: "
@@ -807,6 +725,13 @@ proc toCodeExprInner(
     result.add "["
     result.add self.toCodeExprInner(n[1], level, false)
     result.add "]"
+  of nnkBracket:
+    result.add "{"
+    for i in 0 ..< n.len():
+      result.add self.toCodeExprInner(n[i], level, isLhs)
+      if i + 1 < n.len():
+        result.add ", "
+    result.add "}"
   #of nnkResult:
   #  discard
   of nnkChckRange:
@@ -1040,8 +965,8 @@ proc toCodeExprInner(
       #of nnkCommand:
       #  
       else:
-        #echo repr(n)
-        #echo n.kind
+        echo repr(n)
+        echo n.treeRepr
         fail()
     else:
       #echo repr(n)
@@ -1168,7 +1093,11 @@ proc toCodeVarSection(
       #echo n[1].kind
       if (
         (
-          have(n, @[nnkSym]) 
+          (
+            have(n, @[nnkSym]) 
+          ) or (
+            have(n, @[nnkPragmaExpr])
+          )
         ) and (
           not have(n, @[nnkEmpty], 1)
         )
@@ -1197,8 +1126,17 @@ proc toCodeVarSection(
 
         #var hadArray: ref bool = new bool
         #hadArray[] = false
-        self.hadArray = false
         var tempToAdd: string
+        if have(n, @[nnkPragmaExpr]):
+          if have(n[0], @[nnkPragma], 1):
+            if have(n[0][1], @[nnkSym]):
+              case n[0][1][0].repr():
+              of "cstatic":
+                self.res.add "static "
+              else:
+                let n = n[0][1][0]
+                fail()
+        self.hadArray = false
         tempToAdd = self.toCodeExprInner(
           n[1].getTypeInst(),
           level, isLhs=false, isTypeInst=true, arrayPass=0,
@@ -1210,8 +1148,15 @@ proc toCodeVarSection(
         #echo "not eek: "
         let temp = self.hadArray
         self.res.add " "
+        var mySym: NimNode
+        if have(n, @[nnkSym]):
+          mySym = n[0]
+        elif have(n, @[nnkPragmaExpr]):
+          mySym = n[0][0]
+        else:
+          fail()
         tempToAdd = self.toCodeExprInner(
-          n[0], level, isLhs=true
+          mySym, level, isLhs=true
         )
         #echo tempToAdd
         self.res.add tempToAdd
@@ -1264,8 +1209,9 @@ proc toCodeStmts(
   level: int
 ) = 
   addIndent(self.res, level)
+  #echo "toCodeStmts:"
   #echo repr(nodes)
-  #echo repr(nodes.kind)
+  ##echo repr(nodes.kind)
   #echo nodes.treeRepr
   proc innerFunc(
     self: var Convert,
@@ -1279,6 +1225,11 @@ proc toCodeStmts(
       discard
     of nnkSym:
       discard
+    of nnkPragma:
+      if n[0].kind == nnkExprColonExpr:
+        if have(n[0], @[nnkSym]):
+          if n[0][0].repr() == "craw":
+            self.res.add n[0][1].strVal
     of nnkIfStmt:
       self.toCodeIfStmt(n, level + 1)
       #discard
@@ -1289,7 +1240,7 @@ proc toCodeStmts(
     #  self.toCodeForStmt(n, level + 1)
     of nnkTypeSection:
       self.toCodeTypeSection(n[0], level + 1)
-    of nnkVarSection:
+    of nnkVarSection, nnkLetSection:
       self.toCodeVarSection(n[0], level + 1)
     #of nnkV
     of nnkAsgn:
@@ -1750,7 +1701,12 @@ proc toPipelineCInner*(
   #var i = convert.typedefSeq.len() - 1
   #while i >= 0:
   #for i in convert.typedefSeq.len() - 1 .. 0:
+  code.add "#ifndef __PIPELINEC__\n"
   code.add "#include <stdint.h>\n"
+  code.add "#else\n"
+  code.add "#include \"intN_t.h\"\n"
+  code.add "#include \"uintN_t.h\"\n"
+  code.add "#endif\n"
   code.add "#define uint8_t_c uint8_t\n"
   code.add "#define int8_t_c int8_t\n"
   code.add "#define uint16_t_c uint16_t\n"
