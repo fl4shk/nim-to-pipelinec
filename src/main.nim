@@ -87,11 +87,55 @@ template `+`*(
 ): Vec3 =
   left.plus right
 
+proc `minus`*[T](
+  left: Vec3[T],
+  right: Vec3[T],
+): Vec3[T] =
+  # example 1:
+  var i: int = 0
+  #for i in 0 ..< result.v.len():
+  while i < result.v.len():
+    result[i] = left[i] - right[i]
+    i = i + 1
+
+  ## example 2:
+  #result.x = left.x + right.x
+  #result.y = left.y + right.y
+  #result.z = left.z + right.z
+
+template `-`*(
+  left: Vec3,
+  right: Vec3,
+): Vec3 =
+  left.minus right
+
 #proc doVec3IAdd(
 #  a: Vec3[int],
 #  b: Vec3[int],
 #): Vec3[int] {.importc: "doVec3IAdd".}
 
+
+type
+  AluOpKind* = enum
+    aokAdd,
+    aokSub,
+
+type
+  AluInp*[T] = object
+    a*, b*: T
+    op*: AluOpKind
+
+type
+  AluOutp*[T] = object
+    ret*: T
+
+proc `alu`*[T](
+  inp: AluInp[T]
+): AluOutp[T] =
+  if inp.op == aokAdd:
+    result.ret = inp.a + inp.b
+  else:
+    result.ret = inp.a - inp.b
 
 proc doVec3IAdd(
   a: Vec3[int],
@@ -114,18 +158,37 @@ macro part(): untyped =
     "#pragma PART \"xc7a100tcsg324-1\"\n" 
 
 proc myMain(
-  a: Vec3[int],
-  b: Vec3[int],
-): Vec3[int] {.craw: part,cmainmhz: "300.0",cstatic.} =
+  #a: Vec3[int],
+  #b: Vec3[int],
+  #op: AluOpKind,
+  inp: AluInp[Vec3[int]]
+): AluOutp[Vec3[int]] {.craw: part,cmainmhz: "300.0".} =
   #{.craw: myPragmaStr.}
   #let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
   #let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
-  result = doVec3IAdd(a=a, b=b)
+  #result = doVec3IAdd(a=a, b=b)
+  result = alu(inp)
 
-proc myOuterMain(): Vec3[int] =
+#proc myMain(
+#  a: Vec3[int],
+#  b: Vec3[int],
+#): Vec3[int] {.craw: part,cmainmhz: "300.0",cstatic.} =
+#  #{.craw: myPragmaStr.}
+#  #let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
+#  #let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
+#  result = doVec3IAdd(a=a, b=b)
+
+proc myOuterMain(): AluOutp[Vec3[int]] =
   let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
   let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
-  result = myMain(a=a, b=b)
+  let op: AluOpKind = aokAdd
+  #result = myMain(a=a, b=b, op=op)
+  var aluInp: AluInp[Vec3[int]] = AluInp[Vec3[int]](
+    a: a,
+    b: b,
+    op: op,
+  )
+  result = myMain(aluInp)
 echo toPipelineC(myOuterMain)
 
 #
