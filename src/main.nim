@@ -64,6 +64,11 @@ proc mkVec3[T](
   #temp.y = y
   #temp.z = z
   result = temp
+#template mkVec3(
+#  T: untyped,
+#  x, y, z: untyped,
+#): Vec3 =
+#  Vec3[T](v: [x, y, z])
 
 proc `plus`*[T](
   left: Vec3[T],
@@ -92,11 +97,11 @@ proc `minus`*[T](
   right: Vec3[T],
 ): Vec3[T] =
   # example 1:
-  var i: int = 0
-  #for i in 0 ..< result.v.len():
-  while i < result.v.len():
+  #var i: int = 0
+  for i in 0 ..< result.v.len():
+  #while i < result.v.len():
     result[i] = left[i] - right[i]
-    i = i + 1
+  #  i = i + 1
 
   ## example 2:
   #result.x = left.x + right.x
@@ -167,6 +172,11 @@ proc myMain(
   #let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
   #let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
   #result = doVec3IAdd(a=a, b=b)
+  type
+    MyArray[T] = object
+      arr: array[8, T]
+  var tempA: MyArray[Vec3[int]]
+
   result = alu(inp)
 
 #proc myMain(
@@ -178,30 +188,56 @@ proc myMain(
 #  #let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
 #  result = doVec3IAdd(a=a, b=b)
 
+#proc myTreeReprInner(
+#  obj: NimNode
+#): string =
+#  result = obj.getTypeImpl().treeRepr()
+#
+#macro myTreeRepr(
+#  obj: typed
+#): untyped =
+#  #result = quote do:
+#  #  obj.treeRepr()
+#  newLit(myTreeReprInner(obj))
+
 proc myOuterMain(
-  a: Vec3[int],
+  a: ptr Vec3[int],
   b: Vec3[int],
   op: AluOpKind,
 ): AluOutp[Vec3[int]] =
   #result = myMain(a=a, b=b, op=op)
+  #echo myTreeRepr(a)
+  let tempA: Vec3[int] = mkVec3[int](a[].x, a[].y, a[].z)
   var aluInp: AluInp[Vec3[int]] = AluInp[Vec3[int]](
-    a: a,
+    #a: a[],
+    a: tempA,
     b: b,
     op: op,
   )
   result = myMain(aluInp)
 
-let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
-let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
-let op: AluOpKind = aokAdd
+#let a: Vec3[int] = mkVec3(x=1, y=2, z=3)
+#let b: Vec3[int] = mkVec3(x=7, y=9, z=2)
+#let op: AluOpKind = aokAdd
 proc myOuterOuterMain(): AluOutp[Vec3[int]] =
+  var a: Vec3[int] = mkVec3(x=1, y=2, z=3)
+  let b: Vec3[int] = mkVec3(x=7, y=9, z=2)
+  let op: AluOpKind = aokAdd
   result = myOuterMain(
-    a=a,
+    a=addr(a),
     b=b,
     op=op
   )
+proc myOuterOuterOuterMain(): AluOutp[Vec3[int]] =
+  result = myOuterOuterMain(
+    #a=a,
+    #b=b,
+    #op=op
+  )
 #echo toPipelineC(myOuterMain)
-echo toPipelineC(myOuterOuterMain)
+#echo toPipelineC(myOuterOuterMain)
+echo toPipelineC(myOuterOuterOuterMain, convertPtr=true)
+#echo myOuterOuterOuterMain()
 
 #
 #type

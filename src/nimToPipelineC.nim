@@ -22,6 +22,8 @@ type
     #procRenameTbl: seq[Table[string, string]]
     #objRenameTbl: seq[Table[string, string]]
     #renameLevel: int = 0
+    globalTbl: Table[string, string]
+    globalSeq: seq[string]
     funcTbl: Table[string, string]
     funcSeq: seq[string]
     typedefTbl: Table[string, string]
@@ -30,6 +32,7 @@ type
     useResult: bool
     hadArray: bool
     procName: string
+    convertPtr: bool
 
 macro fail(): untyped =
   result = quote do:
@@ -72,6 +75,7 @@ proc toCodeExprInner(
   arrayPass: int=(-1),
   #hadArray: ref bool=nil,
   typeName: string="",
+  isVarDecl: bool,
 ): string
 
 #proc nextProcRenameTbl(
@@ -110,6 +114,7 @@ proc toCodeExpr(
   level: int,
   isLhs: static bool,
   isTypeInst: bool=false,
+  isVarDecl: bool,
 )
 proc toCodeStmts(
   self: var Convert,
@@ -136,7 +141,7 @@ proc toCodeIfStmt(
       else:
         first = false
       self.res.add "if "
-      self.toCodeExpr(n[0], level, false)
+      self.toCodeExpr(n[0], level, false, isVarDecl=false)
       self.res.add " {\n"
 
       addIndent(self.res, level)
@@ -164,6 +169,7 @@ proc toCodeWhileStmt(
     level=level,
     isLhs=false,
     isTypeInst=false,
+    isVarDecl=false,
   )
   self.res.add " {\n"
   for innerN in n[1 .. ^1]:
@@ -224,6 +230,7 @@ proc toCodeForStmt(
         level=level,
         isLhs=false,
         isTypeInst=false,
+        isVarDecl=false,
       )
       self.res.add "; "
       self.res.add mySym
@@ -236,6 +243,7 @@ proc toCodeForStmt(
         level=level,
         isLhs=false,
         isTypeInst=false,
+        isVarDecl=false,
       )
       self.res.add "; "
       self.res.add mySym
@@ -256,6 +264,8 @@ proc typeRenameInner(
   s: string
 ): (bool, string) =
   case s:
+  of "bool":
+    result = (true, "bool")
   of "int":
     result = (true, "int32_t")
   of "uint":
@@ -291,6 +301,7 @@ proc funcRenameIter(
   paramType: NimNode,
   procName: var string,
   first: var bool,
+  isVarDecl: bool,
 ): string =
   #if paramType.kind == nnkVarTy:
   #  #echo "test"
@@ -311,6 +322,7 @@ proc funcRenameIter(
     isTypeInst=true,
     isSingle=true,
     #typeImpl=paramType,
+    isVarDecl=isVarDecl,
   )
   #if first:
   #  first = false
@@ -326,7 +338,16 @@ proc funcRenameIter(
   if paramType.getTypeImpl().kind != nnkEnumTy:
     procName.add "_c"
     #procName.add "_"
-  procName.add result
+  #procName.add result
+  procName.add self.toCodeExprInner(
+    nodes=paramType,
+    level=0,
+    isLhs=false,
+    isTypeInst=true,
+    isSingle=true,
+    #typeImpl=paramType,
+    isVarDecl=false,
+  )
   #echo "funcRenameIter: " & procName
   #paramsStr.add tempParamsStr
   #result = tempParamsStr
@@ -338,8 +359,8 @@ proc toCodeExprInner(
   #res: var string,
   level: int,
   isLhs: static bool,
-  isTypeInst: bool=false,
-  isSingle: bool=true,
+  isTypeInst: bool,
+  isSingle: bool,
   typeImpl: NimNode=nil,
   inHaveArray: bool=false,
   #stickyInHaveArray: bool=false
@@ -347,6 +368,7 @@ proc toCodeExprInner(
   arrayPass: int=(-1),
   #hadArray: ref bool=nil,
   typeName: string="",
+  isVarDecl: bool,
 ): string =
   var n = nodes
   #echo n.kind
@@ -402,11 +424,12 @@ proc toCodeExprInner(
           level=level,
           isLhs=isLhs,
           isTypeInst=isTypeInst,
-          isSingle=isSingle,
+          isSingle=false,
           typeImpl=nil,
           inHaveArray=false,
           arrayPass=arrayPass,
           typeName="make-it-longer-than-zero-chars",
+          isVarDecl=isVarDecl,
         )
         #echo "myTypeName: ", myTypeName
         discard self.toCodeExprInner(
@@ -414,14 +437,16 @@ proc toCodeExprInner(
           level=level,
           isLhs=isLhs,
           isTypeInst=isTypeInst,
-          isSingle=isSingle,
+          isSingle=false,
           typeImpl=nil,
           inHaveArray=false,
           arrayPass=arrayPass,
-          typeName=myTypeName
+          typeName=myTypeName,
+          isVarDecl=isVarDecl,
         )
     proc innerHandleIdentSym(
       someN: NimNode,
+      someIsSingle: bool,
       someTypeImpl: NimNode=nil,
     ): string =
       var tempStr: (bool, string) = typeRenameInner(someN.strVal)
@@ -437,17 +462,61 @@ proc toCodeExprInner(
         #echo someN.getImpl()
         #echo someN.getTypeInst()
       #result.add someN.strVal
-      if someN.getTypeImpl().kind != nnkEnumTy:
-        if not tempStr[0]:
-          result.add tempStr[1].replace("_", "_a")
-          #result.add tempStr[1]#.replace("_", "_a")
-        else:
-          result.add tempStr[1]
-        #if not isSingle:
-        result.add "_c"
-      else:
+
+      #let mainMangleCond = (
+      #  (
+      #    someN.getTypeImpl().kind != nnkEnumTy
+      #  ) and (
+      #    not someIsSingle
+      #  ) and (
+      #    not tempStr[0]
+      #  )
+      #)
+      let haveEnumTy = (
+        someN.getTypeImpl().kind != nnkEnumTy
+      )
+      if (
+        (
+          haveEnumTy
+        ) or (
+          (
+            someIsSingle
+          ) and (
+            (
+              tempStr[0]
+            ) or (
+              tempStr[1].find("_") == -1
+            )
+          )
+        )
+      ):
         result.add tempStr[1]
-        #result.add "_"
+      else:
+        result.add tempStr[1].replace("_", "_a")
+        result.add "_c"
+
+      #if mangleCond:
+      #  discard
+      #else:
+      #  discard
+
+      #if (
+      #  (
+      #    someN.getTypeImpl().kind != nnkEnumTy
+      #  ) and (
+      #    not someIsSingle
+      #  )
+      #):
+      #  if not tempStr[0]:
+      #    result.add tempStr[1].replace("_", "_a")
+      #    #result.add tempStr[1]#.replace("_", "_a")
+      #  else:
+      #    result.add tempStr[1]
+      #  #if not isSingle:
+      #  result.add "_c"
+      #else:
+      #  result.add tempStr[1]
+      #  #result.add "_"
 
     #echo "isTypeInst: " & repr(n)
     case n.kind:
@@ -456,6 +525,7 @@ proc toCodeExprInner(
       #echo n.treeRepr
       result.add innerHandleIdentSym(
         someN=n,
+        someIsSingle=isSingle,
         someTypeImpl=typeImpl,
       )
     #of nnkSym:
@@ -507,6 +577,7 @@ proc toCodeExprInner(
               typeImpl=nil, # we already have the implementation I think?
               inHaveArray=true,
               arrayPass=arrayPass,
+              isVarDecl=isVarDecl,
             )
 
           case n.kind:
@@ -585,16 +656,24 @@ proc toCodeExprInner(
             #echo typeImpl[0].treeRepr
             result.add innerHandleIdentSym(
               someN=n[0],
+              someIsSingle=false,
               someTypeImpl=typeImpl[0],
             )
           else:
             result.add innerHandleIdentSym(
               someN=n[0],
+              someIsSingle=false,
               someTypeImpl=nil
             )
         else:
           result.add self.toCodeExprInner(
-            n[0], level, isLhs, true, false, typeImpl
+            nodes=n[0],
+            level=level,
+            isLhs=isLhs,
+            isTypeInst=true,
+            isSingle=false,
+            typeImpl=typeImpl,
+            isVarDecl=isVarDecl,
           )
         result.add "_b"
         case n[1].kind:
@@ -604,16 +683,24 @@ proc toCodeExprInner(
             #echo typeImpl[1].treeRepr
             result.add innerHandleIdentSym(
               someN=n[1],
+              someIsSingle=false,
               someTypeImpl=typeImpl[1],
             )
           else:
             result.add innerHandleIdentSym(
               someN=n[1],
+              someIsSingle=false,
               someTypeImpl=nil
             )
         else:
           result.add self.toCodeExprInner(
-            n[1], level, isLhs, true, false, typeImpl
+            nodes=n[1],
+            level=level,
+            isLhs=isLhs,
+            isTypeInst=true,
+            isSingle=false,
+            typeImpl=typeImpl,
+            isVarDecl=isVarDecl,
           )
         #result.add "_d"
     of nnkUIntLit, nnkUInt8Lit, nnkUInt16Lit, nnkUInt32Lit, nnkUInt64Lit:
@@ -653,8 +740,14 @@ proc toCodeExprInner(
         if n[0].kind == nnkOpenSymChoice:
           #echo "n[0].kind == nnkOpenSymChoice: first:"
           result.add self.toCodeExprInner(
-            innerTypeInst, level, isLhs, isTypeInst, isSingle,
-            innerTypeImpl, arrayPass=arrayPass
+            nodes=innerTypeInst,
+            level=level,
+            isLhs=isLhs,
+            isTypeInst=isTypeInst,
+            isSingle=isSingle,
+            typeImpl=innerTypeImpl,
+            arrayPass=arrayPass,
+            isVarDecl=isVarDecl,
           )
           #result.add "_b"
           #var idx = 2
@@ -713,13 +806,15 @@ proc toCodeExprInner(
             level, isLhs=false, isSingle=true, isTypeInst=true,
             arrayPass=0,
             #hadArray=hadArray
+            isVarDecl=isVarDecl,
           )
         else:
           tempToAdd = self.toCodeExprInner(
             memberDef[1].getTypeImpl(),
             level, isLhs=false, isSingle=true, isTypeInst=true,
-            arrayPass=0, typeName=memberDef[1].getTypeInst().repr
+            arrayPass=0, typeName=memberDef[1].getTypeInst().repr,
             #hadArray=hadArray
+            isVarDecl=isVarDecl,
           )
           
         #echo "tempToAdd: "
@@ -728,7 +823,8 @@ proc toCodeExprInner(
         let temp = self.hadArray
         toAdd.add " "
         tempToAdd = self.toCodeExprInner(
-          memberDef[0], level, isLhs=true
+          memberDef[0], level, isLhs=true,
+          isVarDecl=isVarDecl,
         )
         toAdd.add tempToAdd
         if temp:
@@ -738,12 +834,14 @@ proc toCodeExprInner(
               memberDef[1].getTypeInst(),
               level, isLhs=false, isSingle=true, isTypeInst=true,
               arrayPass=1,
+              isVarDecl=isVarDecl,
             )
           else:
             toAdd.add self.toCodeExprInner(
               memberDef[1].getTypeImpl(),
               level, isLhs=false, isSingle=true, isTypeInst=true,
-              arrayPass=1, typeName=memberDef[1].getTypeInst().repr
+              arrayPass=1, typeName=memberDef[1].getTypeInst().repr,
+              isVarDecl=isVarDecl,
             )
 
         toAdd.add ";\n"
@@ -781,9 +879,33 @@ proc toCodeExprInner(
       result = typeName
     of nnkEmpty:
       discard
-    else:
-      #echo "typeinst nnkOther:"
+    of nnkPtrTy:
+      #echo "typeinst nnkPtrTy:"
       #echo n.treeRepr
+      if self.convertPtr:
+        result.add self.toCodeExprInner(
+          nodes=nodes[0],
+          level=level,
+          isLhs=isLhs,
+          isTypeInst=isTypeInst,
+          isSingle=isSingle,
+          typeImpl=typeImpl,
+          inHaveArray=inHaveArray,
+          arrayPass=arrayPass,
+          typeName=typeName,
+          isVarDecl=isVarDecl,
+        )
+        if isVarDecl:
+          result.add "*"
+        else:
+          result.add "_p"
+      else:
+        echo "typeinst nnkPtrTy:"
+        echo n.treeRepr
+        fail()
+    else:
+      echo "typeinst nnkOther:"
+      echo n.treeRepr
       fail()
 
     return result
@@ -802,33 +924,110 @@ proc toCodeExprInner(
       fail()
     else:
       result.add "("
-      result.add self.toCodeExprInner(n[1], level, isLhs)
+      result.add self.toCodeExprInner(
+        n[1], level, isLhs,
+        isVarDecl=isVarDecl,
+      )
       result.add " "
       if n[0].repr in ["mod"] and n[1].getType().repr != "int":
         result.add("fmod")
       else:
         result.add(n[0].strVal)
       result.add " "
-      result.add self.toCodeExprInner(n[2], level, isLhs)
+      result.add self.toCodeExprInner(
+        n[2], level, isLhs,
+        isVarDecl=isVarDecl,
+      )
       result.add ")"
+  of nnkAddr:
+    #echo "non-typeinst nnkAddr:"
+    #echo n.treeRepr
+    #echo ""
+    ##echo "n.getImpl():"
+    ##echo n.getImpl().treeRepr
+    ##echo ""
+    #echo "n.getType():"
+    #echo n.getType().treeRepr
+    #echo ""
+    #echo "n.getTypeImpl():"
+    #echo n.getTypeImpl().treeRepr
+    #echo ""
+    #echo "n.getTypeInst():"
+    #echo n.getTypeInst().treeRepr
+    result.add "(&"
+    result.add self.toCodeExprInner(
+      n[0], level, isLhs, isVarDecl=isVarDecl
+    )
+    result.add ")"
+  of nnkDerefExpr:
+    #echo "non-typeinst nnkDerefExpr:"
+    #echo n.treeRepr
+    #echo ""
+    ##echo "n.getImpl():"
+    ##echo n.getImpl().treeRepr
+    ##echo ""
+    #echo "n.getType():"
+    #echo n.getType().treeRepr
+    #echo ""
+    #echo "n.getTypeImpl():"
+    #echo n.getTypeImpl().treeRepr
+    #echo ""
+    #echo "n.getTypeInst():"
+    #echo n.getTypeInst().treeRepr
+    ##fail()
+    result.add "(*"
+    result.add self.toCodeExprInner(
+      n[0], level, isLhs,
+      isVarDecl=isVarDecl,
+    )
+    result.add ")"
   of nnkDotExpr:
-    result.add self.toCodeExprInner(n[0], level, isLhs)
+    #echo "non-typeinst nnkDotExpr:"
+    #echo n.treeRepr
+    #echo ""
+    ##echo "n.getImpl():"
+    ##echo n.getImpl().treeRepr
+    ##echo ""
+    #echo "n.getType():"
+    #echo n.getType().treeRepr
+    #echo ""
+    #echo "n.getTypeImpl():"
+    #echo n.getTypeImpl().treeRepr
+    #echo ""
+    #echo "n.getTypeInst():"
+    #echo n.getTypeInst().treeRepr
+    result.add self.toCodeExprInner(
+      n[0], level, isLhs,
+      isVarDecl=isVarDecl,
+    )
     result.add "."
-    result.add self.toCodeExprInner(n[1], level, isLhs)
+    result.add self.toCodeExprInner(
+      n[1], level, isLhs,
+      isVarDecl=isVarDecl,
+    )
   of nnkBracketExpr:
     #if n[0].kind == nnkBracketExpr:
     #  discard
     #else:
     #echo "test: " & $n.len
     #when not isTypeInst:
-    result.add self.toCodeExprInner(n[0], level, isLhs)
+    result.add self.toCodeExprInner(
+      n[0], level, isLhs,
+      isVarDecl=isVarDecl,
+    )
     result.add "["
-    result.add self.toCodeExprInner(n[1], level, false)
+    result.add self.toCodeExprInner(
+      n[1], level, false,
+      isVarDecl=isVarDecl,
+    )
     result.add "]"
   of nnkBracket:
     result.add "{"
     for i in 0 ..< n.len():
-      result.add self.toCodeExprInner(n[i], level, isLhs)
+      result.add self.toCodeExprInner(
+        n[i], level, isLhs,
+        isVarDecl=isVarDecl,
+      )
       if i + 1 < n.len():
         result.add ", "
     result.add "}"
@@ -841,7 +1040,10 @@ proc toCodeExprInner(
     result.add "(("
     result.add typeStr
     result.add ")"
-    result.add self.toCodeExprInner(n[0], level, false)
+    result.add self.toCodeExprInner(
+      n[0], level, false,
+      isVarDecl=isVarDecl,
+    )
     result.add ")"
   of nnkHiddenStdConv:
     var typeStr = typeRename(n.getType.repr)
@@ -851,13 +1053,19 @@ proc toCodeExprInner(
     #elif typeStr == "float" and n[1].kind == nnkFloatLit:
     #  discard
     if typeStr.startsWith("range["):
-      result.add self.toCodeExprInner(n[1], level, false)
+      result.add self.toCodeExprInner(
+        n[1], level, false,
+        isVarDecl=isVarDecl,
+      )
     else:
       for j in 1 .. n.len-1:
         result.add "(("
         result.add typeStr
         result.add ")"
-        result.add self.toCodeExprInner(n[1], level, false)
+        result.add self.toCodeExprInner(
+          n[1], level, false,
+          isVarDecl=isVarDecl,
+        )
         result.add ")"
 
   else:
@@ -898,7 +1106,8 @@ proc toCodeExprInner(
         #case n[0].kind:
         #of nnkBracketExpr:
         typeName = self.toCodeExprInner(
-          n[0], level, isLhs, true, true
+          n[0], level, isLhs, true, true,
+          isVarDecl=isVarDecl,
         )
         #else:
         #  typeName = n[0].strVal
@@ -939,7 +1148,10 @@ proc toCodeExprInner(
           #echo ""
           #echo "--------"
 
-          result.add self.toCodeExprInner(n[i][1], level, isLhs)
+          result.add self.toCodeExprInner(
+            n[i][1], level, isLhs,
+            isVarDecl=isVarDecl,
+          )
           #else:
           #  self.toCodeExprInner(n[i][0], level, isLhs)
           if i + 1 < n.len:
@@ -1031,6 +1243,7 @@ proc toCodeExprInner(
                 paramType=paramType,
                 procName=procName,
                 first=first,
+                isVarDecl=false,
               )
               #echo paramType.treeRepr
           #echo "post for loop"
@@ -1052,6 +1265,7 @@ proc toCodeExprInner(
             level=level,
             isLhs=false,
             isTypeInst=true,
+            isVarDecl=isVarDecl,
           )
           procName = procName & "_g" & returnType
           #procName = procName & "_" & returnType
@@ -1060,9 +1274,15 @@ proc toCodeExprInner(
           for i in 1 ..< n.len:
             case n[i].kind:
             of nnkExprEqExpr:
-              result.add self.toCodeExprInner(n[i][1], level, isLhs)
+              result.add self.toCodeExprInner(
+                n[i][1], level, isLhs,
+                isVarDecl=isVarDecl,
+              )
             else:
-              result.add self.toCodeExprInner(n[i], level, isLhs)
+              result.add self.toCodeExprInner(
+                n[i], level, isLhs,
+                isVarDecl=isVarDecl,
+              )
             if i + 1 < n.len:
               result.add ", "
           result.add ")"
@@ -1083,9 +1303,13 @@ proc toCodeExpr(
   #res: var string,
   level: int,
   isLhs: static bool,
-  isTypeInst: bool=false
+  isTypeInst: bool=false,
+  isVarDecl: bool,
 ) =
-  self.res.add self.toCodeExprInner(nodes, level, isLhs, isTypeInst)
+  self.res.add self.toCodeExprInner(
+    nodes, level, isLhs, isTypeInst,
+    isVarDecl=isVarDecl,
+  )
   discard
 
 proc toCodeAsgn(
@@ -1103,6 +1327,7 @@ proc toCodeAsgn(
         #res=res,
         level=level,
         isLhs=true,
+        isVarDecl=false,
       )
       self.res.add " = "
       self.toCodeExpr(
@@ -1110,6 +1335,7 @@ proc toCodeAsgn(
         #res=res,
         level=level,
         isLhs=false,
+        isVarDecl=false,
       )
     else:
       fail()
@@ -1261,6 +1487,7 @@ proc toCodeVarSection(
           n[1].getTypeInst(),
           level, isLhs=false, isTypeInst=true, arrayPass=0,
           #hadArray=hadArray
+          isVarDecl=true,
         )
         #echo "tempToAdd: " & tempToAdd
         self.res.add tempToAdd
@@ -1276,7 +1503,7 @@ proc toCodeVarSection(
         else:
           fail()
         tempToAdd = self.toCodeExprInner(
-          mySym, level, isLhs=true
+          mySym, level, isLhs=true, isVarDecl=true,
         )
         #echo tempToAdd
         self.res.add tempToAdd
@@ -1286,10 +1513,11 @@ proc toCodeVarSection(
           self.res.add self.toCodeExprInner(
             n[1].getTypeInst(),
             level, isLhs=false, isTypeInst=true, arrayPass=1,
+            isVarDecl=true,
           )
         if not have(n, @[nnkEmpty], 2):
           self.res.add " = "
-          self.toCodeExpr(n[2], level, isLhs=false)
+          self.toCodeExpr(n[2], level, isLhs=false, isVarDecl=true)
         self.res.add ";\n"
       #elif have(n, @[nnkSym, nnkEmpty]):
       #  if have(n, @[nnkSym], 2):
@@ -1454,7 +1682,7 @@ proc toCodeStmts(
       self.toCodeAsgn(n, level + 1)
     of nnkCall:
       #self.toCodeCall(n, level + 1)
-      self.toCodeExpr(n, level + 1, false)
+      self.toCodeExpr(n, level + 1, false, isVarDecl=false)
     of nnkBracket:
       #echo repr(n)
       #n.dumpAstGen
@@ -1627,6 +1855,7 @@ proc procDef(
           level=0,
           isLhs=false,
           isTypeInst=true,
+          isVarDecl=true,
         )
         #echo returnType
         #echo "--------"
@@ -1711,6 +1940,7 @@ proc procDef(
                   ),
                   procName=procName,
                   first=first,
+                  isVarDecl=true,
                 )
               )
             else:
@@ -1891,6 +2121,7 @@ proc findTopLevel(
 
 proc toPipelineCInner*(
   s: NimNode,
+  convertPtr: NimNode,
 ): string =
   var code: string
   #code.add "asdf"
@@ -1916,7 +2147,9 @@ proc toPipelineCInner*(
   ##  #typedefTbl=typedefTbl,
   ##  #res=code,
   ##)
+  #echo $convertPtr
   var convert: Convert
+  convert.convertPtr = ($convertPtr == "true")
   convert.findTopLevel(n)
   #echo convert.funcTbl
   #echo convert.typedefTbl
@@ -1941,15 +2174,15 @@ proc toPipelineCInner*(
   code.add "#include \"float_e_m_t.h\"\n"
   code.add "#include \"bool.h\"\n"
   code.add "#endif\n"
-  code.add "#define uint8_t_c uint8_t\n"
-  code.add "#define int8_t_c int8_t\n"
-  code.add "#define uint16_t_c uint16_t\n"
-  code.add "#define int16_t_c int16_t\n"
-  code.add "#define uint32_t_c uint32_t\n"
-  code.add "#define int32_t_c int32_t\n"
-  code.add "#define uint64_t_c uint64_t\n"
-  code.add "#define int64_t_c int64_t\n"
-  code.add "#define float_c float\n"
+  #code.add "#define uint8_t_c uint8_t\n"
+  #code.add "#define int8_t_c int8_t\n"
+  #code.add "#define uint16_t_c uint16_t\n"
+  #code.add "#define int16_t_c int16_t\n"
+  #code.add "#define uint32_t_c uint32_t\n"
+  #code.add "#define int32_t_c int32_t\n"
+  #code.add "#define uint64_t_c uint64_t\n"
+  #code.add "#define int64_t_c int64_t\n"
+  #code.add "#define float_c float\n"
   for v in convert.typedefSeq:
     #echo "convert test"
     #code.add convert.typedefSeq[i]
@@ -1974,9 +2207,10 @@ proc toPipelineCInner*(
 
 macro toPipelineC*(
   s: typed,
+  convertPtr: typed,
 ): untyped =
   #echo s.treeRepr
-  newLit(toPipelineCInner(s))
+  newLit(toPipelineCInner(s, convertPtr=convertPtr))
   #echo s.treeRepr
   #result = quote do:
   #result = quote do:
