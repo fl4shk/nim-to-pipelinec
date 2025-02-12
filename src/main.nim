@@ -178,10 +178,11 @@ proc myMain(
 #  #let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
 #  result = doVec3IAdd(a=a, b=b)
 
-proc myOuterMain(): AluOutp[Vec3[int]] =
-  let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
-  let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
-  let op: AluOpKind = aokAdd
+proc myOuterMain(
+  a: Vec3[int],
+  b: Vec3[int],
+  op: AluOpKind,
+): AluOutp[Vec3[int]] =
   #result = myMain(a=a, b=b, op=op)
   var aluInp: AluInp[Vec3[int]] = AluInp[Vec3[int]](
     a: a,
@@ -189,7 +190,18 @@ proc myOuterMain(): AluOutp[Vec3[int]] =
     op: op,
   )
   result = myMain(aluInp)
-echo toPipelineC(myOuterMain)
+
+let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
+let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
+let op: AluOpKind = aokAdd
+proc myOuterOuterMain(): AluOutp[Vec3[int]] =
+  result = myOuterMain(
+    a=a,
+    b=b,
+    op=op
+  )
+#echo toPipelineC(myOuterMain)
+echo toPipelineC(myOuterOuterMain)
 
 #
 #type

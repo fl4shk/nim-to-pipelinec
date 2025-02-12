@@ -318,7 +318,13 @@ proc funcRenameIter(
   #  #procName.add "_"
   #else:
   #  #discard
-  procName.add "_c"
+  #echo "funcRenameIter:"
+  #echo paramType.kind
+  #echo ""
+  #echo paramType.getTypeImpl().kind
+  #echo ""
+  if paramType.getTypeImpl().kind != nnkEnumTy:
+    procName.add "_c"
     #procName.add "_"
   procName.add result
   #echo "funcRenameIter: " & procName
@@ -431,13 +437,16 @@ proc toCodeExprInner(
         #echo someN.getImpl()
         #echo someN.getTypeInst()
       #result.add someN.strVal
-      if not tempStr[0]:
-        result.add tempStr[1].replace("_", "_a")
-        #result.add tempStr[1]#.replace("_", "_a")
+      if someN.getTypeImpl().kind != nnkEnumTy:
+        if not tempStr[0]:
+          result.add tempStr[1].replace("_", "_a")
+          #result.add tempStr[1]#.replace("_", "_a")
+        else:
+          result.add tempStr[1]
+        #if not isSingle:
+        result.add "_c"
       else:
         result.add tempStr[1]
-      #if not isSingle:
-      result.add "_c"
         #result.add "_"
 
     #echo "isTypeInst: " & repr(n)
