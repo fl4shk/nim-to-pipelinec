@@ -430,6 +430,7 @@ proc toCodeExprInner(
     #if typeImpl != nil:
     #  if typeImpl.kind == nnkObjectTy:
     if typeName.len == 0:
+      #echo n.treeRepr()
       let tempTypeImpl = n.getTypeImpl()
       let tempTypeInst = n.getTypeInst()
       #echo "tempTypeImpl:"
@@ -1780,6 +1781,13 @@ proc toCodeStmts(
       discard
     of nnkDiscardStmt:
       discard
+    of nnkReturnStmt:
+      #echo n.treeRepr()
+      #self.res.add "return "
+      #self.toCodeExpr(n[0], level, false, isVarDecl=false)
+      #self.res.add ";"
+      #discard
+      self.toCodeStmts(n[0], level)
     else:
       #echo n
       #echo repr(n)
@@ -2115,8 +2123,7 @@ proc procDef(
         if origProcName notin self.noMangleTbl:
           self.noMangleTbl[origProcName] = pragmaFlagArr[pfkNoMangle]
         elif self.noMangleTbl[origProcName]:
-          echo "error: can't have overloading with \"cnomangle\""
-          fail()
+          errFail("error: can't have overloading with \"cnomangle\"")
       else: # if pass == 1:
         #echo "ending? " & procName
         foundElse = true
