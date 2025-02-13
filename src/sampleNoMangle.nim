@@ -37,20 +37,25 @@ template `&`*(
   obj: untyped
 ): untyped =
   addr(obj)
+
+#template `->`*(
+#  obj: ptr 
+#): untyped
 #macro `->`*(
-#  obj: untyped,
+#  obj: typed,
 #  mbr: untyped,
 #): untyped = 
 #  #(obj[]).mbr
 #  result = quote do:
-#    (`obj`).`mbr`
+#    `obj`.`mbr`
 
 proc outerMain(): Vec3I32 {.cnomangle.}=
-  let left: Vec3I32 = Vec3I32(v: [1, 2, 3])
-  let right: Vec3I32 = Vec3I32(v: [5, 6, 7])
+  let test = 3u
+  let left = Vec3I32(v: [1, 2, 3])
+  let right = Vec3I32(v: [5, 6, 7])
   #result = (&(left)).vec3i32_add(addr(right))
-  let pLeft: ptr Vec3I32 = addr(left)
-  let pRight: ptr Vec3I32 = addr(right)
+  let pLeft = &left
+  let pRight = &right
   #result = addr(left)->vec3i32_add(addr(right))
   #result = addr(left)->vec3i32_add(addr(right))
   #result = pLeft.v3add(pRight)

@@ -1034,15 +1034,24 @@ proc toCodeExprInner(
     #echo ""
     #echo "n.getTypeInst():"
     #echo n.getTypeInst().treeRepr
-    result.add self.toCodeExprInner(
-      n[0], level, isLhs,
-      isVarDecl=isVarDecl,
-    )
-    result.add "."
+    result.add "("
+    if n[0].kind == nnkDerefExpr:
+      result.add self.toCodeExprInner(
+        n[0][0], level, isLhs,
+        isVarDecl=isVarDecl,
+      )
+      result.add "->"
+    else:
+      result.add self.toCodeExprInner(
+        n[0], level, isLhs,
+        isVarDecl=isVarDecl,
+      )
+      result.add "."
     result.add self.toCodeExprInner(
       n[1], level, isLhs,
       isVarDecl=isVarDecl,
     )
+    result.add ")"
   of nnkBracketExpr:
     #if n[0].kind == nnkBracketExpr:
     #  discard
@@ -1109,11 +1118,33 @@ proc toCodeExprInner(
   else:
     when not isLhs:
       case n.kind:
+      of nnkConv:
+        #if have(n, @[nnkSym]):
+          result.add "(("
+          #result.add n[0].repr()
+          result.add self.toCodeExprInner(
+            nodes=n[0].getTypeInst(),
+            level=level,
+            isLhs=false,
+            isTypeInst=true,
+            isVarDecl=isVarDecl,
+          )
+          result.add ")"
+          result.add self.toCodeExprInner(
+            nodes=n[1],
+            level=level,
+            isLhs=false,
+            isTypeInst=false,
+            isVarDecl=isVarDecl,
+          )
+          result.add ")"
+        #else:
+        #  fail()
       of nnkIntLit:
         #result.add("((int)" & $n.intVal & ")")
         result.add($n.intVal)
       of nnkUIntLit:
-        result.add("((unsigned int)" & $n.intVal & ")")
+        result.add("((uint32_t)" & $n.intVal & ")")
       of nnkInt8Lit:
         result.add("((int8_t)" & $n.intVal & ")")
       of nnkUInt8Lit:
@@ -1477,16 +1508,20 @@ proc toCodeVarSection(
       #echo ""
       #echo n[1].getTypeImpl().treeRepr
       #echo "--------"
+      let tempCond = (
+        (
+          have(n, @[nnkSym]) 
+        ) or (
+          have(n, @[nnkPragmaExpr])
+        )
+      )
       if (
         (
-          (
-            have(n, @[nnkSym]) 
-          ) or (
-            have(n, @[nnkPragmaExpr])
-          )
-        ) and (
-          not have(n, @[nnkEmpty], 1)
+          tempCond
         )
+        #and (
+        #  not have(n, @[nnkEmpty], 1)
+        #)
       ):
         #if n[1].strVal != "array":
         #if (
@@ -1531,8 +1566,13 @@ proc toCodeVarSection(
         #echo n[1].getTypeImpl().treeRepr
         #echo ""
         #echo n[1].getTypeInst().treeRepr
+        var tempN: NimNode
+        if not have(n, @[nnkEmpty], 1):
+          tempN = n[1]
+        else:
+          tempN = n[2]
         tempToAdd = self.toCodeExprInner(
-          n[1].getTypeInst(),
+          tempN.getTypeInst(),
           level, isLhs=false, isTypeInst=true, arrayPass=0,
           #hadArray=hadArray
           isVarDecl=true,

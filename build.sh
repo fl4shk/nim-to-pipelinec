@@ -32,9 +32,12 @@ MY_NIM_OPTS="$MY_NIM_OPTS --parallelBuild:0"
 #MY_NIM_OPTS="$MY_NIM_OPTS --run"
 
 #echo nim $MY_NIM_OPTS src/Main.nim #panicoverride.nim
-nim $MY_NIM_OPTS src/sampleNoMangle.nim #src/main.nim #panicoverride.nim
-mv ./src/sampleNoMangle .
-./sampleNoMangle
+#PROJ=sampleNoMangle
+PROJ="$1"
+#nim $MY_NIM_OPTS src/sampleNoMangle.nim #src/main.nim #panicoverride.nim
+nim $MY_NIM_OPTS src/"$PROJ".nim #src/main.nim #panicoverride.nim
+mv ./src/"$PROJ" .
+./"$PROJ"
 #mv src/main ./main
 #./main
 #nim --run Main
