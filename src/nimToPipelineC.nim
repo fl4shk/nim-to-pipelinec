@@ -6,6 +6,8 @@ import borrowed
 {.experimental: "caseStmtMacros".}
 
 template `cstatic`*() {.pragma.}
+template `cconst`*() {.pragma.}
+template `cnomangle`*() {.pragma.}
 template `craw`*(
   key: string
 ) {.pragma.}
@@ -18,13 +20,18 @@ template `cmainmhz`*(
 #  {.pragma: imported, importc, cdecl, raises: [], gcsafe.}
 
 type
+  FuncTblElem = object
+    #doMangle: bool
+    defn: string
+
+type
   Convert = object
     #procRenameTbl: seq[Table[string, string]]
     #objRenameTbl: seq[Table[string, string]]
     #renameLevel: int = 0
     globalTbl: Table[string, string]
     globalSeq: seq[string]
-    funcTbl: Table[string, string]
+    funcTbl: Table[string, FuncTblElem]
     funcSeq: seq[string]
     typedefTbl: Table[string, string]
     typedefSeq: seq[string]
@@ -33,6 +40,7 @@ type
     hadArray: bool
     procName: string
     convertPtr: bool
+    noMangleTbl: Table[string, bool]
 
 macro fail(): untyped =
   result = quote do:
@@ -264,6 +272,8 @@ proc typeRenameInner(
   s: string
 ): (bool, string) =
   case s:
+  of "char":
+    result = (true, "char")
   of "bool":
     result = (true, "bool")
   of "int":
@@ -299,6 +309,7 @@ proc typeRename(
 proc funcRenameIter(
   self: var Convert,
   paramType: NimNode,
+  #origProcName: string,
   procName: var string,
   first: var bool,
   isVarDecl: bool,
@@ -335,6 +346,10 @@ proc funcRenameIter(
   #echo ""
   #echo paramType.getTypeImpl().kind
   #echo ""
+  #echo "funcRenameIter:"
+  #echo "origProcName: ", origProcName,
+  #if not self.noMangleTbl[origProcName]:
+  #if not self.noMangleTbl[procName]:
   if paramType.getTypeImpl().kind != nnkEnumTy:
     procName.add "_c"
     #procName.add "_"
@@ -1159,6 +1174,10 @@ proc toCodeExprInner(
         result.add "}"
       of nnkCall:
         var procName: string = n[0].strVal #& "_f"
+        var origProcName: string = procName
+        #echo "expr nnkCall:"
+        #echo "procName: ", procName
+        #echo "origProcName: ", origProcName
         #echo "expr nnkCall: ", procName
         #echo n.treeRepr
         #echo n[0].getTypeInst().treeRepr
@@ -1241,6 +1260,7 @@ proc toCodeExprInner(
               #echo "doing rename: "
               discard self.funcRenameIter(
                 paramType=paramType,
+                #origProcName=origProcName,
                 procName=procName,
                 first=first,
                 isVarDecl=false,
@@ -1267,7 +1287,10 @@ proc toCodeExprInner(
             isTypeInst=true,
             isVarDecl=isVarDecl,
           )
-          procName = procName & "_g" & returnType
+          if not self.noMangleTbl[origProcName]:
+            procName = procName & "_g" & returnType
+          else:
+            procName = origProcName
           #procName = procName & "_" & returnType
           result.add procName
           result.add "("
@@ -1473,6 +1496,8 @@ proc toCodeVarSection(
               case n[0][1][0].repr():
               of "cstatic":
                 self.res.add "static "
+              of "cconst":
+                self.res.add "const "
               else:
                 let n = n[0][1][0]
                 fail()
@@ -1555,8 +1580,9 @@ proc toCodePragmaStmtInner(
   nodes: NimNode,
   level: int,
   #procName: string,
-): string =
+): (bool, string) =
   let n = nodes
+  result[0] = false
   #proc innerFunc(
   #  self: var Convert,
   #  nodes: NimNode,
@@ -1607,7 +1633,12 @@ proc toCodePragmaStmtInner(
       #result.add self.innerFunc(nodes=item, level=level)
       case item.repr():
       of "cstatic":
-        result.add "static"
+        result[1].add "static "
+      of "cconst":
+        result[1].add "const "
+      of "cnomangle":
+        #result.add "nomangle "
+        result[0] = true
       else:
         let n = item
         fail()
@@ -1615,20 +1646,28 @@ proc toCodePragmaStmtInner(
       #result.add self.innerFunc(nodes=item[0], level=level)
       case item[0].repr():
       of "craw":
-        result.add item[1].strVal
+        result[1].add item[1].strVal
       of "cmainmhz":
-        result.add "#pragma MAIN_MHZ "
-        result.add self.procName
-        result.add " "
-        result.add item[1].strVal
-        result.add "\n"
+        result[1].add "#pragma MAIN_MHZ "
+        result[1].add self.procName
+        result[1].add " "
+        result[1].add item[1].strVal
+        result[1].add "\n"
       of "importc":
         discard
       else:
         let n = item
         fail()
+    of nnkCall:
+      result[1].add self.toCodePragmaStmtInner(
+        nodes=item,
+        level=level,
+      )[1]
     else:
-      discard
+      fail()
+
+  #self.noMangleSeq.add result[0]
+
 proc toCodePragmaStmt(
   self: var Convert,
   nodes: NimNode,
@@ -1637,7 +1676,7 @@ proc toCodePragmaStmt(
 ) =
   self.res.add self.toCodePragmaStmtInner(
     nodes=nodes, level=level, #procName=procName,
-  )
+  )[1]
 proc toCodeStmts(
   self: var Convert,
   nodes: NimNode,
@@ -1690,6 +1729,12 @@ proc toCodeStmts(
       #echo n.treeRepr
       discard
     of nnkCommentStmt:
+      #addIndent(self.res, level)
+      #self.res.add "// "
+      #self.res.add n.strVal
+      #self.res.add "\n"
+      discard
+    of nnkDiscardStmt:
       discard
     else:
       #echo n
@@ -1755,8 +1800,10 @@ proc procDef(
   #parentNode: NimNode,
   procNode: NimNode,
   typeImpl: NimNode,
+  pass: int,
 ): (string, string, bool) =
   var procName = ""
+  var origProcName = ""
   var paramsStr = ""
   var returnType = "void"
   #result[0] = false
@@ -1781,6 +1828,8 @@ proc procDef(
   #echo "----"
   #var myProcPragmaStr: string
   var myProcPragmaSeq: seq[NimNode]
+  var haveNoMangle: bool = false
+  var haveGenerics: bool = false
 
   var foundElse: bool = false
   for n in procNode:
@@ -1798,13 +1847,21 @@ proc procDef(
       #myProcPragmaStr.add self.toCodePragmaStmtInner(
       #  nodes=n, level=0, procName=#isProc=true
       #)
-      myProcPragmaSeq.add n
-      discard
+      haveNoMangle = self.toCodePragmaStmtInner(
+        nodes=n, level=0, #procName=isProc=true
+      )[0]
+      if not haveNoMangle:
+        myProcPragmaSeq.add n
+      elif haveGenerics:
+        echo "error: can't have generics with \"cnomangle\""
+        fail()
     of nnkSym:
       procName = $n
+      origProcName = procName
     of nnkAccQuoted:
       if n.len == 1:
         procName = $n[0]
+        origProcName = procName
       else:
         fail()
     of nnkBracket:
@@ -1816,7 +1873,12 @@ proc procDef(
         )
       ):
         #echo n.treeRepr
+        #echo "haveNoMangle: ", haveNoMangle
+        if haveNoMangle:
+          echo "error: can't have generics with \"cnomangle\""
+          fail()
         let n = n[1]
+        haveGenerics = true
         if n[0].kind == nnkIdentDefs:
           #for i in 0 ..< n[0].len:
           ##for paramDef in n[0]:
@@ -1841,157 +1903,172 @@ proc procDef(
       else:
         fail()
     of nnkFormalParams:
-      if n[0].kind != nnkEmpty:
-        #returnType = n[0].strVal
-        #echo "returnType:"
-        #echo n.treeRepr
-        #echo ""
-        #echo n[0].treeRepr
-        #echo n[0].getTypeImpl().treeRepr
-        #echo n[0].getTypeInst().treeRepr
-        #echo typeImpl
-        returnType = self.toCodeExprInner(
-          nodes=typeImpl[0][0],
-          level=0,
-          isLhs=false,
-          isTypeInst=true,
-          isVarDecl=true,
-        )
-        #echo returnType
-        #echo "--------"
-      var idx = 1
-      for paramDef in n[1 .. ^1]:
-        # the paramDef is like `x, y, z: float`
-        #echo "paramDef:"
-        #echo paramDef.treeRepr
-        var first: bool = true
-        if paramDef.kind != nnkEmpty:
-          for param in paramDef[0 ..< ^2]:
-          #for otherIdx in 0 ..< paramDef[0 ..< ^2].len:
-            #let param = paramDef[otherIdx]
-            #echo "param stuff:"
-            #echo param.treeRepr
-            #echo "the length: ", paramDef[0 ..< ^2].len()
-            # Process each `x`, `y`, `z` in a loop
-            paramsStr.add "  "
-            let paramName = param.repr()
-            #echo "here's the paramName: ", paramName
-            #let paramType = param.getTypeInst()
-            #let paramTypeImpl = param.getTypeImpl()
-            #echo "#--------"
-            #echo "testificate:"
-            #echo typeImpl.treeRepr
-            #echo ""
-            #echo "----#----"
-            #echo param.treeRepr
-            #echo ""
-            #echo paramType.treeRepr
-            #echo ""
-            #echo paramTypeImpl.treeRepr
-            #echo "--------"
-            #echo paramName & ": " & $paramType
-            #dumpAstNode(n)
-            #dumpTree(n)
-            #if paramType.kind == nnkVarTy:
-            #  #echo "test"
-            #  #fail()
-            #  #let n = paramType
-            #  fail()
-            ##elif paramType.kind == nnkBracketExpr:
-            ##  #fail()
-            #else:
-            #paramsStr.add ""
-            #paramsStr.add paramType.strVal
-            #let tempParamsStr = self.toCodeExprInner(
-            #  nodes=paramType,
-            #  level=0,
-            #  isLhs=false,
-            #  isTypeInst=true,
-            #)
-            #if first:
-            #  first = false
-            #  procName.add "_f"
-            #else:
-            #  procName.add "_c"
-            #procName.add tempParamsStr
-            #paramsStr.add tempParamsStr
-            #echo "procName: " & procName
-            #echo "paramsStr.add: "
-            #echo typeImpl[0][idx].treeRepr
-            #echo ""
-            #echo typeImpl[0][idx].treeRepr
-            #echo "note:"
-            #echo typeImpl[idx].treeRepr
-            #echo "idx, otherIdx: " & $idx & " " & $otherIdx
-            #echo typeImpl[0][idx].treeRepr
-            #echo "kind: ", typeImpl[0][idx].kind
-            case typeImpl[0][idx].kind:
-            of nnkIdentDefs:
-              #echo "temp: "
-              #echo typeImpl[0][0][idx][1].treeRepr
+      #echo "nnkFormalParams: ", pass, " ", procName
+      #if pass == 0:
+      if pass == 1:
+      #else:
+        if n[0].kind != nnkEmpty:
+          #returnType = n[0].strVal
+          #echo "returnType:"
+          #echo n.treeRepr
+          #echo ""
+          #echo n[0].treeRepr
+          #echo n[0].getTypeImpl().treeRepr
+          #echo n[0].getTypeInst().treeRepr
+          #echo typeImpl
+          returnType = self.toCodeExprInner(
+            nodes=typeImpl[0][0],
+            level=0,
+            isLhs=false,
+            isTypeInst=true,
+            isVarDecl=true,
+          )
+          #echo returnType
+          #echo "--------"
+        var idx = 1
+        for paramDef in n[1 .. ^1]:
+          # the paramDef is like `x, y, z: float`
+          #echo "paramDef:"
+          #echo paramDef.treeRepr
+          var first: bool = true
+          if paramDef.kind != nnkEmpty:
+            for param in paramDef[0 ..< ^2]:
+            #for otherIdx in 0 ..< paramDef[0 ..< ^2].len:
+              #let param = paramDef[otherIdx]
+              #echo "param stuff:"
+              #echo param.treeRepr
+              #echo "the length: ", paramDef[0 ..< ^2].len()
+              # Process each `x`, `y`, `z` in a loop
+              paramsStr.add "  "
+              let paramName = param.repr()
+              #echo "here's the paramName: ", paramName
+              #let paramType = param.getTypeInst()
+              #let paramTypeImpl = param.getTypeImpl()
+              #echo "#--------"
+              #echo "testificate:"
+              #echo typeImpl.treeRepr
+              #echo ""
+              #echo "----#----"
+              #echo param.treeRepr
+              #echo ""
+              #echo paramType.treeRepr
+              #echo ""
+              #echo paramTypeImpl.treeRepr
+              #echo "--------"
+              #echo paramName & ": " & $paramType
+              #dumpAstNode(n)
+              #dumpTree(n)
+              #if paramType.kind == nnkVarTy:
+              #  #echo "test"
+              #  #fail()
+              #  #let n = paramType
+              #  fail()
+              ##elif paramType.kind == nnkBracketExpr:
+              ##  #fail()
+              #else:
+              #paramsStr.add ""
+              #paramsStr.add paramType.strVal
+              #let tempParamsStr = self.toCodeExprInner(
+              #  nodes=paramType,
+              #  level=0,
+              #  isLhs=false,
+              #  isTypeInst=true,
+              #)
+              #if first:
+              #  first = false
+              #  procName.add "_f"
+              #else:
+              #  procName.add "_c"
+              #procName.add tempParamsStr
+              #paramsStr.add tempParamsStr
+              #echo "procName: " & procName
+              #echo "paramsStr.add: "
               #echo typeImpl[0][idx].treeRepr
-              #echo typeImpl[0][idx][1].treeRepr
-              #echo "temp end:"
-              paramsStr.add(
-                self.funcRenameIter(
-                  paramType=(
-                    #paramType
-                    typeImpl[0][idx][1]
-                  ),
-                  procName=procName,
-                  first=first,
-                  isVarDecl=true,
+              #echo ""
+              #echo typeImpl[0][idx].treeRepr
+              #echo "note:"
+              #echo typeImpl[idx].treeRepr
+              #echo "idx, otherIdx: " & $idx & " " & $otherIdx
+              #echo typeImpl[0][idx].treeRepr
+              #echo "kind: ", typeImpl[0][idx].kind
+              case typeImpl[0][idx].kind:
+              of nnkIdentDefs:
+                #echo "temp: "
+                #echo typeImpl[0][0][idx][1].treeRepr
+                #echo typeImpl[0][idx].treeRepr
+                #echo typeImpl[0][idx][1].treeRepr
+                #echo "temp end:"
+                paramsStr.add(
+                  self.funcRenameIter(
+                    paramType=(
+                      #paramType
+                      typeImpl[0][idx][1]
+                    ),
+                    #origProcName=origProcName,
+                    procName=procName,
+                    first=first,
+                    isVarDecl=true,
+                  )
                 )
-              )
-            else:
-              discard
-            #echo "idx: ", $idx
-            paramsStr.add " "
-            paramsStr.add paramName
-            paramsStr.add ",\n"
-            idx += 1
+              else:
+                discard
+              #echo "idx: ", $idx
+              paramsStr.add " "
+              paramsStr.add paramName
+              paramsStr.add ",\n"
+              idx += 1
       if paramsStr.len > 0:
         # remove the final ",\n" since C doesn't support that
         paramsStr.setLen(paramsStr.len - 2)
         paramsStr.add "\n"
     else:
-      #echo "ending? " & procName
-      foundElse = true
-      self.res.setLen(0)
-      self.res.add "\n"
-      procName = procName & "_g" & returnType
-      #procName = procName & "_" & returnType
-      result[0] = procName
-      #echo "setting result[0]"
-      #echo procName
-      #echo "--------"
-
-      self.res.add returnType & " " & procName & "("
-      #if result[0].len > 0:
-      #  procName.add "_f" & result[0]
-      #self.res.add "("
-      if paramsStr.len == 0:
-        self.res.add "void"
-      else:
+      if pass == 0:
+        if origProcName notin self.noMangleTbl:
+          self.noMangleTbl[origProcName] = haveNoMangle
+        elif self.noMangleTbl[origProcName]:
+          echo "error: can't have overloading with \"cnomangle\""
+          fail()
+      else: # if pass == 1:
+        #echo "ending? " & procName
+        foundElse = true
+        self.res.setLen(0)
         self.res.add "\n"
-        self.res.add paramsStr
-      self.res.add ") {\n"
-      self.useResult = self.hasResult(n)
-      if self.useResult:
-        self.res.addIndent(1)
-        self.res.add returnType
-        self.res.add " result;"
-      self.procName = procName
-      self.toCodeStmts(n, 0)
-      if self.useResult:
-        if "return result" notin self.res[^20..^1]:
-          self.res.addIndent(1)
-          self.res.add "return result;\n"
+        if not haveNoMangle:
+          procName = procName & "_g" & returnType
+        else:
+          procName = origProcName
+        #procName = procName & "_" & returnType
+        result[0] = procName
+        #echo "setting result[0]"
+        #echo procName
+        #echo "--------"
+
+        self.res.add returnType & " " & procName & "("
+        #if result[0].len > 0:
+        #  procName.add "_f" & result[0]
+        #self.res.add "("
+        if paramsStr.len == 0:
+          self.res.add "void"
         else:
           self.res.add "\n"
-      else:
-        self.res.add "\n"
-      self.res.add "}"
+          self.res.add paramsStr
+        self.res.add ") {\n"
+        self.useResult = self.hasResult(n)
+        if self.useResult:
+          self.res.addIndent(1)
+          self.res.add returnType
+          self.res.add " result;"
+        self.procName = procName
+        self.toCodeStmts(n, 0)
+        if self.useResult:
+          if "return result" notin self.res[^20..^1]:
+            self.res.addIndent(1)
+            self.res.add "return result;\n"
+          else:
+            self.res.add "\n"
+        else:
+          self.res.add "\n"
+        self.res.add "}"
     #echo "--------"
     #echo "for loop end:"
     #echo procName
@@ -2009,7 +2086,7 @@ proc procDef(
     #echo procPragma.treeRepr
     result[1].add self.toCodePragmaStmtInner(
       nodes=procPragma, level=0, #procName=#isProc=true
-    )
+    )[1]
 
   result[1].add self.res
 
@@ -2039,9 +2116,10 @@ proc findTopLevel(
       if (
         (
           procName in ignoreFuncs
-        ) or (
-          procName in self.funcTbl
         )
+        #or (
+        #  procName in self.funcTbl
+        #)
       ):
         #echo "continuing"
         continue
@@ -2063,7 +2141,7 @@ proc findTopLevel(
         let innerTypeImpl = n[0].getTypeImpl()
         #let innerTypeInst = n[0].getTypeInst()
         #let innerType = n[0].getType()
-        ###echo repr(impl)
+        ##echo repr(impl)
         #echo "impl.treeRepr:"
         #echo impl.treeRepr
         #echo ""
@@ -2078,11 +2156,28 @@ proc findTopLevel(
         #echo innerType.treeRepr
         #echo "--------"
         #self.nextProcRenameTbl(typeImpl)
+
+        #self.noMangleTbl.add false
+        var tempImpl: NimNode
+        if impl.kind != nnkTemplateDef:
+          tempImpl = impl
+        else:
+          continue
+          ##tempImpl = innerTypeImpl
+          ##tempImpl = n.getTypeInst()
+          #tempImpl = n
+          #echo "other tempImpl:"
+          #echo tempImpl.treeRepr
+
+        var myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=0)
+
+        #let innerProcName = myProcDef[0]
+
         self.findTopLevel(
           impl#, innerTypeImpl
         )
-        let myProcDef = self.procDef(impl, innerTypeImpl)
-        #let innerProcName = myProcDef[0]
+        myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=1)
+
         if (
           (
             myProcDef[0] in ignoreFuncs
@@ -2099,6 +2194,18 @@ proc findTopLevel(
           #echo myProcDef[0]
           #echo myProcDef[1]
           #echo "..."
+          #var cond: bool = true
+          #if cond:
+          #  cond = myProcDef[0] in self.funcTbl
+          #if cond:
+          #  cond = self.funcTbl[myProcDef[0]].doMangle
+          #if cond:
+          #  #cond =
+          #  discard
+
+          #if cond:
+          #  fail()
+          #else:
           continue
         #echo "adding this function:"
         #echo procName
@@ -2106,7 +2213,10 @@ proc findTopLevel(
         #echo myProcDef[1]
         #echo "..."
         self.funcSeq.add myProcDef[1]
-        self.funcTbl[myProcDef[0]] = self.funcSeq[^1]
+        self.funcTbl[myProcDef[0]] = FuncTblElem(
+          #doMangle: not self.noMangleTbl[^1],
+          defn: self.funcSeq[^1],
+        )
         #if self.procRenameTbl.len > 0:
         #  discard self.procRenameTbl.pop()
       else:

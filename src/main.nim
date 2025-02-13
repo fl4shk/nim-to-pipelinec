@@ -134,19 +134,27 @@ type
   AluOutp*[T] = object
     ret*: T
 
+#dumpTree:
+#  proc `alu`*[T](
+#    inp: AluInp[T]
+#  ): AluOutp[T] {.cstatic,cnomangle.} =
+#    if inp.op == aokAdd:
+#      result.ret = inp.a + inp.b
+#    else:
+#      result.ret = inp.a - inp.b
 proc `alu`*[T](
   inp: AluInp[T]
-): AluOutp[T] =
+): AluOutp[T] {.cstatic.} =
   if inp.op == aokAdd:
     result.ret = inp.a + inp.b
   else:
     result.ret = inp.a - inp.b
 
-proc doVec3IAdd(
-  a: Vec3[int],
-  b: Vec3[int],
-): Vec3[int] =
-  result = a + b
+#proc doVec3IAdd(
+#  a: Vec3[int],
+#  b: Vec3[int],
+#): Vec3[int] =
+#  result = a + b
 
 #macro myPragmaStr(): untyped =
 #  result = quote do:
@@ -167,15 +175,16 @@ proc myMain(
   #b: Vec3[int],
   #op: AluOpKind,
   inp: AluInp[Vec3[int]]
-): AluOutp[Vec3[int]] {.craw: part,cmainmhz: "300.0".} =
+): AluOutp[Vec3[int]] {.cnomangle,craw: part,cmainmhz: "300.0".} =
   #{.craw: myPragmaStr.}
   #let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
   #let b: Vec3[int] = mkVec3[int](x=7, y=9, z=2)
   #result = doVec3IAdd(a=a, b=b)
-  type
-    MyArray[T] = object
-      arr: array[8, T]
-  var tempA: MyArray[Vec3[int]]
+
+  #type
+  #  MyArray[T] = object
+  #    arr: array[8, T]
+  #var tempA: MyArray[Vec3[int]]
 
   result = alu(inp)
 
