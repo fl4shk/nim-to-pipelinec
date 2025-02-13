@@ -8,6 +8,7 @@ import borrowed
 template `cstatic`*() {.pragma.}
 template `cconst`*() {.pragma.}
 template `cextern`*() {.pragma.}
+template `cnodecl`*() {.pragma.}
 template `cnomangle`*() {.pragma.}
 template `craw`*(
   key: string
@@ -1643,6 +1644,7 @@ type
   PragmaFlagKind = enum
     pfkStatic,
     pfkExtern,
+    pfkNoDecl,
     pfkNoMangle,
     pfkLim,
 proc toCodePragmaStmtInner(
@@ -1652,7 +1654,7 @@ proc toCodePragmaStmtInner(
   #procName: string,
 ): (array[pfkLim, bool], string) =
   let n = nodes
-  result[0] = [false, false, false]
+  result[0] = [false, false, false, false]
   #proc innerFunc(
   #  self: var Convert,
   #  nodes: NimNode,
@@ -1710,6 +1712,8 @@ proc toCodePragmaStmtInner(
       of "cextern":
         #echo "testificate"
         result[0][pfkExtern] = true
+      of "cnodecl":
+        result[0][pfkNoDecl] = true
       of "cnomangle":
         #result.add "nomangle "
         result[0][pfkNoMangle] = true
@@ -1745,6 +1749,8 @@ proc toCodePragmaStmtInner(
       result[1].add tempResult[1]
     else:
       fail()
+  #echo "test: "
+  #echo result
   #if result[0][pfkStatic]:
   #  echo "found \"cstatic\""
   #if result[0][pfkExtern]:
@@ -1939,6 +1945,8 @@ proc procDef(
     of nnkEmpty:
       discard
     of nnkPragma:
+      #echo "procDef() nnkPragma:"
+      #echo n.treeRepr()
       # TODO: come back to this later
       #myProcPragmaStr.add self.toCodePragmaStmtInner(
       #  nodes=n, level=0, procName=#isProc=true
@@ -1966,17 +1974,27 @@ proc procDef(
             "for a `proc`/`func`"
           )
         )
+      #if (
+      #  not (
+      #    (
+      #      pragmaFlagArr[pfkExtern]
+      #    ) or (
+      #      pragmaFlagArr[pfkNoMangle]
+      #    )
+      #  )
+      #):
+      myProcPragmaSeq.add n
       if (
-        not (
+        (
           (
             pragmaFlagArr[pfkExtern]
           ) or (
             pragmaFlagArr[pfkNoMangle]
           )
+        ) and (
+          haveGenerics
         )
       ):
-        myProcPragmaSeq.add n
-      elif haveGenerics:
         #echo "error: can't have generics with \"cnomangle\""
         errFail(
           (
@@ -2226,14 +2244,15 @@ proc procDef(
   #if myProcPragmaStr.len() > 0:
   #  result[1] = myProcPragmaStr
   #  result[1].add " "
-  for procPragma in myProcPragmaSeq:
-    #echo "procPragma:"
-    #echo procPragma.treeRepr
-    result[1].add self.toCodePragmaStmtInner(
-      nodes=procPragma, level=0, #procName=#isProc=true
-    )[1]
+  if not pragmaFlagArr[pfkNoDecl]:
+    for procPragma in myProcPragmaSeq:
+      #echo "procPragma:"
+      #echo procPragma.treeRepr
+      result[1].add self.toCodePragmaStmtInner(
+        nodes=procPragma, level=0, #procName=#isProc=true
+      )[1]
 
-  result[1].add self.res
+    result[1].add self.res
 
   result[2] = foundElse
   #echo result
