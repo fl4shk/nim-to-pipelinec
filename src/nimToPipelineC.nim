@@ -41,6 +41,7 @@ type
     hadArray: bool
     procName: string
     regularC: bool
+    cppConstRefInp: bool
     noMangleTbl: Table[string, bool]
 
 macro fail(): untyped =
@@ -2147,6 +2148,8 @@ proc procDef(
                     isVarDecl=true,
                   )
                 )
+                if self.cppConstRefInp:
+                  paramsStr.add " IN"
               else:
                 discard
               #echo "idx: ", $idx
@@ -2374,6 +2377,7 @@ proc findTopLevel(
 proc toPipelineCInner*(
   s: NimNode,
   regularC: NimNode,
+  cppConstRefInp: NimNode,
 ): string =
   var code: string
   #code.add "asdf"
@@ -2402,6 +2406,7 @@ proc toPipelineCInner*(
   #echo $regularC
   var convert: Convert
   convert.regularC = ($regularC == "true")
+  convert.cppConstRefInp = ($cppConstRefInp == "true")
   convert.findTopLevel(n)
   #echo convert.funcTbl
   #echo convert.typedefTbl
@@ -2426,6 +2431,12 @@ proc toPipelineCInner*(
   code.add "#include \"float_e_m_t.h\"\n"
   code.add "#include \"bool.h\"\n"
   code.add "#endif\n"
+  if convert.cppConstRefInp:
+    code.add "#ifdef __cplusplus\n" 
+    code.add "#define IN const &\n"
+    code.add "#else\n"
+    code.add "#define IN\n"
+    code.add "#endif\n"
   #code.add "#define uint8_t_c uint8_t\n"
   #code.add "#define int8_t_c int8_t\n"
   #code.add "#define uint16_t_c uint16_t\n"
@@ -2460,9 +2471,14 @@ proc toPipelineCInner*(
 macro toPipelineC*(
   s: typed,
   regularC: typed,
+  cppConstRefInp: typed,
 ): untyped =
   #echo s.treeRepr
-  newLit(toPipelineCInner(s, regularC=regularC))
+  newLit(toPipelineCInner(
+    s,
+    regularC=regularC,
+    cppConstRefInp=cppConstRefInp,
+  ))
   #echo s.treeRepr
   #result = quote do:
   #result = quote do:

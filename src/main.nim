@@ -251,7 +251,11 @@ proc myOuterOuterOuterMain(): AluOutp[Vec3[int]] =
   )
 #echo toPipelineC(myOuterMain)
 #echo toPipelineC(myOuterOuterMain)
-echo toPipelineC(myOuterOuterOuterMain, regularC=false)
+echo toPipelineC(
+  myOuterOuterOuterMain,
+  regularC=false,
+  cppConstRefInp=true,
+)
 #echo myOuterOuterOuterMain()
 
 #
