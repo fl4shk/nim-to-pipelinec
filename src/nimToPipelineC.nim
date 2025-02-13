@@ -1,12 +1,13 @@
 import std/macros
-import strutils
+import std/strutils
 import std/tables#, src/fusion/matching
 import borrowed
 
-{.experimental: "caseStmtMacros".}
+#{.experimental: "caseStmtMacros".}
 
 template `cstatic`*() {.pragma.}
 template `cconst`*() {.pragma.}
+template `cextern`*() {.pragma.}
 template `cnomangle`*() {.pragma.}
 template `craw`*(
   key: string
@@ -39,7 +40,7 @@ type
     useResult: bool
     hadArray: bool
     procName: string
-    convertPtr: bool
+    regularC: bool
     noMangleTbl: Table[string, bool]
 
 macro fail(): untyped =
@@ -51,6 +52,14 @@ macro fail(): untyped =
       ) & (
         n.treeRepr
       )
+    )
+macro errFail(
+  msg: string
+): untyped =
+  result = quote do:
+    assert(
+      false,
+      `msg`,
     )
 #macro fail(
 #  n: untyped
@@ -897,7 +906,7 @@ proc toCodeExprInner(
     of nnkPtrTy:
       #echo "typeinst nnkPtrTy:"
       #echo n.treeRepr
-      if self.convertPtr:
+      if self.regularC:
         result.add self.toCodeExprInner(
           nodes=nodes[0],
           level=level,
@@ -917,7 +926,10 @@ proc toCodeExprInner(
       else:
         echo "typeinst nnkPtrTy:"
         echo n.treeRepr
-        fail()
+        errFail(
+          "error: regular C mode not enabled"
+        )
+        #fail()
     else:
       echo "typeinst nnkOther:"
       echo n.treeRepr
@@ -969,11 +981,16 @@ proc toCodeExprInner(
     #echo ""
     #echo "n.getTypeInst():"
     #echo n.getTypeInst().treeRepr
-    result.add "(&"
-    result.add self.toCodeExprInner(
-      n[0], level, isLhs, isVarDecl=isVarDecl
-    )
-    result.add ")"
+    if self.regularC:
+      result.add "(&"
+      result.add self.toCodeExprInner(
+        n[0], level, isLhs, isVarDecl=isVarDecl
+      )
+      result.add ")"
+    else:
+      errFail(
+        "error: regular C mode not enabled"
+      )
   of nnkDerefExpr:
     #echo "non-typeinst nnkDerefExpr:"
     #echo n.treeRepr
@@ -990,12 +1007,17 @@ proc toCodeExprInner(
     #echo "n.getTypeInst():"
     #echo n.getTypeInst().treeRepr
     ##fail()
-    result.add "(*"
-    result.add self.toCodeExprInner(
-      n[0], level, isLhs,
-      isVarDecl=isVarDecl,
-    )
-    result.add ")"
+    if self.regularC:
+      result.add "(*"
+      result.add self.toCodeExprInner(
+        n[0], level, isLhs,
+        isVarDecl=isVarDecl,
+      )
+      result.add ")"
+    else:
+      errFail(
+        "error: regular C mode not enabled"
+      )
   of nnkDotExpr:
     #echo "non-typeinst nnkDotExpr:"
     #echo n.treeRepr
@@ -1575,14 +1597,20 @@ proc toCodeVarSection(
     #echo n
     fail()
 
+type
+  PragmaFlagKind = enum
+    pfkStatic,
+    pfkExtern,
+    pfkNoMangle,
+    pfkLim,
 proc toCodePragmaStmtInner(
   self: var Convert,
   nodes: NimNode,
   level: int,
   #procName: string,
-): (bool, string) =
+): (array[pfkLim, bool], string) =
   let n = nodes
-  result[0] = false
+  result[0] = [false, false, false]
   #proc innerFunc(
   #  self: var Convert,
   #  nodes: NimNode,
@@ -1634,11 +1662,15 @@ proc toCodePragmaStmtInner(
       case item.repr():
       of "cstatic":
         result[1].add "static "
+        result[0][pfkStatic] = true
       of "cconst":
         result[1].add "const "
+      of "cextern":
+        #echo "testificate"
+        result[0][pfkExtern] = true
       of "cnomangle":
         #result.add "nomangle "
-        result[0] = true
+        result[0][pfkNoMangle] = true
       else:
         let n = item
         fail()
@@ -1659,12 +1691,24 @@ proc toCodePragmaStmtInner(
         let n = item
         fail()
     of nnkCall:
-      result[1].add self.toCodePragmaStmtInner(
+      let tempResult = self.toCodePragmaStmtInner(
         nodes=item,
         level=level,
-      )[1]
+      )
+      #echo tempResult[0].len()
+      for idx in 0 ..< tempResult[0].len():
+        let myPfk = PragmaFlagKind(idx)
+        if tempResult[0][myPfk]:
+          result[0][myPfk] = true
+      result[1].add tempResult[1]
     else:
       fail()
+  #if result[0][pfkStatic]:
+  #  echo "found \"cstatic\""
+  #if result[0][pfkExtern]:
+  #  echo "found \"cextern\""
+  #if result[0][pfkNoMangle]:
+  #  echo "found \"cnomangle\""
 
   #self.noMangleSeq.add result[0]
 
@@ -1828,11 +1872,14 @@ proc procDef(
   #echo "----"
   #var myProcPragmaStr: string
   var myProcPragmaSeq: seq[NimNode]
-  var haveNoMangle: bool = false
+  var pragmaFlagArr: array[pfkLim, bool]
+  #var haveExtern: bool = false
+  #var haveNoMangle: bool = false
   var haveGenerics: bool = false
 
   var foundElse: bool = false
   for n in procNode:
+    #echo "for n in procNode:"
     #echo n.kind
     #echo n.treeRepr
     #echo "----"
@@ -1847,14 +1894,48 @@ proc procDef(
       #myProcPragmaStr.add self.toCodePragmaStmtInner(
       #  nodes=n, level=0, procName=#isProc=true
       #)
-      haveNoMangle = self.toCodePragmaStmtInner(
+      pragmaFlagArr = self.toCodePragmaStmtInner(
         nodes=n, level=0, #procName=isProc=true
       )[0]
-      if not haveNoMangle:
+      #if pragmaFlagArr[pfkExtern]:
+      #  echo "setting haveExtern to true"
+      #  haveExtern = true
+      #if pragmaFlagArr[pfkNoMangle]:
+      #  echo "setting haveNoMangle to true"
+      #  haveNoMangle = true
+      if (
+        (
+          pragmaFlagArr[pfkExtern]
+        ) and (
+          pragmaFlagArr[pfkStatic]
+        )
+      ):
+        errFail(
+          (
+            "error: can't have both \"cextern\" and \"cstatic\" "
+          ) & (
+            "for a `proc`/`func`"
+          )
+        )
+      if (
+        not (
+          (
+            pragmaFlagArr[pfkExtern]
+          ) or (
+            pragmaFlagArr[pfkNoMangle]
+          )
+        )
+      ):
         myProcPragmaSeq.add n
       elif haveGenerics:
-        echo "error: can't have generics with \"cnomangle\""
-        fail()
+        #echo "error: can't have generics with \"cnomangle\""
+        errFail(
+          (
+            "error: can't have generics with "
+          ) & (
+            "\"cextern\" and/or \"cnomangle\""
+          )
+        )
     of nnkSym:
       procName = $n
       origProcName = procName
@@ -1872,11 +1953,19 @@ proc procDef(
           n[1].kind == nnkGenericParams
         )
       ):
+        #echo "nnkBracket:"
         #echo n.treeRepr
+        #echo "haveExtern: ", haveExtern
         #echo "haveNoMangle: ", haveNoMangle
-        if haveNoMangle:
-          echo "error: can't have generics with \"cnomangle\""
-          fail()
+        if pragmaFlagArr[pfkExtern] or pragmaFlagArr[pfkNoMangle]:
+          #echo "error: can't have generics with \"cnomangle\""
+          errFail(
+            (
+              "error: can't have generics with "
+            ) & (
+              "\"cextern\" and/or \"cnomangle\""
+            )
+          )
         let n = n[1]
         haveGenerics = true
         if n[0].kind == nnkIdentDefs:
@@ -2024,7 +2113,7 @@ proc procDef(
     else:
       if pass == 0:
         if origProcName notin self.noMangleTbl:
-          self.noMangleTbl[origProcName] = haveNoMangle
+          self.noMangleTbl[origProcName] = pragmaFlagArr[pfkNoMangle]
         elif self.noMangleTbl[origProcName]:
           echo "error: can't have overloading with \"cnomangle\""
           fail()
@@ -2033,7 +2122,7 @@ proc procDef(
         foundElse = true
         self.res.setLen(0)
         self.res.add "\n"
-        if not haveNoMangle:
+        if not pragmaFlagArr[pfkNoMangle]:
           procName = procName & "_g" & returnType
         else:
           procName = origProcName
@@ -2043,6 +2132,8 @@ proc procDef(
         #echo procName
         #echo "--------"
 
+        if pragmaFlagArr[pfkExtern]:
+          self.res.add "extern "
         self.res.add returnType & " " & procName & "("
         #if result[0].len > 0:
         #  procName.add "_f" & result[0]
@@ -2052,23 +2143,27 @@ proc procDef(
         else:
           self.res.add "\n"
           self.res.add paramsStr
-        self.res.add ") {\n"
-        self.useResult = self.hasResult(n)
-        if self.useResult:
-          self.res.addIndent(1)
-          self.res.add returnType
-          self.res.add " result;"
-        self.procName = procName
-        self.toCodeStmts(n, 0)
-        if self.useResult:
-          if "return result" notin self.res[^20..^1]:
+        self.res.add ")"
+        if not pragmaFlagArr[pfkExtern]:
+          self.res.add " {\n"
+          self.useResult = self.hasResult(n)
+          if self.useResult:
             self.res.addIndent(1)
-            self.res.add "return result;\n"
+            self.res.add returnType
+            self.res.add " result;"
+          self.procName = procName
+          self.toCodeStmts(n, 0)
+          if self.useResult:
+            if "return result" notin self.res[^20..^1]:
+              self.res.addIndent(1)
+              self.res.add "return result;\n"
+            else:
+              self.res.add "\n"
           else:
             self.res.add "\n"
+          self.res.add "}"
         else:
-          self.res.add "\n"
-        self.res.add "}"
+          self.res.add ";"
     #echo "--------"
     #echo "for loop end:"
     #echo procName
@@ -2231,7 +2326,7 @@ proc findTopLevel(
 
 proc toPipelineCInner*(
   s: NimNode,
-  convertPtr: NimNode,
+  regularC: NimNode,
 ): string =
   var code: string
   #code.add "asdf"
@@ -2257,9 +2352,9 @@ proc toPipelineCInner*(
   ##  #typedefTbl=typedefTbl,
   ##  #res=code,
   ##)
-  #echo $convertPtr
+  #echo $regularC
   var convert: Convert
-  convert.convertPtr = ($convertPtr == "true")
+  convert.regularC = ($regularC == "true")
   convert.findTopLevel(n)
   #echo convert.funcTbl
   #echo convert.typedefTbl
@@ -2317,10 +2412,10 @@ proc toPipelineCInner*(
 
 macro toPipelineC*(
   s: typed,
-  convertPtr: typed,
+  regularC: typed,
 ): untyped =
   #echo s.treeRepr
-  newLit(toPipelineCInner(s, convertPtr=convertPtr))
+  newLit(toPipelineCInner(s, regularC=regularC))
   #echo s.treeRepr
   #result = quote do:
   #result = quote do:

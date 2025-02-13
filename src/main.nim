@@ -150,6 +150,11 @@ proc `alu`*[T](
   else:
     result.ret = inp.a - inp.b
 
+proc `myVec3IntAlu`*(
+  inp: AluInp[Vec3[int]]
+): AluOutp[Vec3[int]] {.cextern,cnomangle.} =
+  discard
+
 #proc doVec3IAdd(
 #  a: Vec3[int],
 #  b: Vec3[int],
@@ -186,7 +191,8 @@ proc myMain(
   #    arr: array[8, T]
   #var tempA: MyArray[Vec3[int]]
 
-  result = alu(inp)
+  #result = alu(inp)
+  result = myVec3IntAlu(inp=inp)
 
 #proc myMain(
 #  a: Vec3[int],
@@ -210,13 +216,13 @@ proc myMain(
 #  newLit(myTreeReprInner(obj))
 
 proc myOuterMain(
-  a: ptr Vec3[int],
+  a: Vec3[int],
   b: Vec3[int],
   op: AluOpKind,
 ): AluOutp[Vec3[int]] =
   #result = myMain(a=a, b=b, op=op)
   #echo myTreeRepr(a)
-  let tempA: Vec3[int] = mkVec3[int](a[].x, a[].y, a[].z)
+  let tempA: Vec3[int] = mkVec3[int](a.x, a.y, a.z)
   var aluInp: AluInp[Vec3[int]] = AluInp[Vec3[int]](
     #a: a[],
     a: tempA,
@@ -233,7 +239,7 @@ proc myOuterOuterMain(): AluOutp[Vec3[int]] =
   let b: Vec3[int] = mkVec3(x=7, y=9, z=2)
   let op: AluOpKind = aokAdd
   result = myOuterMain(
-    a=addr(a),
+    a=(a),
     b=b,
     op=op
   )
@@ -245,7 +251,7 @@ proc myOuterOuterOuterMain(): AluOutp[Vec3[int]] =
   )
 #echo toPipelineC(myOuterMain)
 #echo toPipelineC(myOuterOuterMain)
-echo toPipelineC(myOuterOuterOuterMain, convertPtr=true)
+echo toPipelineC(myOuterOuterOuterMain, regularC=false)
 #echo myOuterOuterOuterMain()
 
 #
