@@ -1418,7 +1418,8 @@ proc toCodeAsgn(
       )
     else:
       fail()
-  self.res.addSmart(';')
+  #self.res.addSmart(';')
+  self.res.add ";"
       
   #for n in nodes:
   #  case n.kind:
@@ -1814,6 +1815,7 @@ proc toCodeStmts(
     of nnkCall:
       #self.toCodeCall(n, level + 1)
       self.toCodeExpr(n, level + 1, false, isVarDecl=false)
+      self.res.add ";"
     of nnkBracket:
       #echo repr(n)
       #n.dumpAstGen
@@ -1835,7 +1837,7 @@ proc toCodeStmts(
       #self.res.add ";"
       #discard
       self.toCodeStmts(n[0], level)
-      self.res.add ";"
+      #self.res.add ";"
     else:
       #echo n
       #echo repr(n)
