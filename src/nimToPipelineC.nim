@@ -961,6 +961,10 @@ proc toCodeExprInner(
       result.add " "
       if n[0].repr in ["mod"] and n[1].getType().repr != "int":
         result.add("fmod")
+      elif n[0].repr == "shl":
+        result.add "<<"
+      elif n[0].repr == "shr":
+        result.add ">>"
       else:
         result.add(n[0].strVal)
       result.add " "
