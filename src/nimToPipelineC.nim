@@ -2209,11 +2209,12 @@ proc procDef(
               #echo "kind: ", typeImpl[0][idx].kind
               case typeImpl[0][idx].kind:
               of nnkIdentDefs:
-                #echo "temp: "
+                echo "temp: "
                 #echo typeImpl[0][0][idx][1].treeRepr
                 #echo typeImpl[0][idx].treeRepr
                 #echo typeImpl[0][idx][1].treeRepr
-                #echo "temp end:"
+                echo typeImpl[0][idx].treeRepr()
+                echo "temp end:"
                 paramsStr.add(
                   self.funcRenameIter(
                     paramType=(
