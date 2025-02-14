@@ -1835,6 +1835,7 @@ proc toCodeStmts(
       #self.res.add ";"
       #discard
       self.toCodeStmts(n[0], level)
+      self.res.addSmart ';'
     else:
       #echo n
       #echo repr(n)
