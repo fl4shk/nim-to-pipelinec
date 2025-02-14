@@ -1834,10 +1834,10 @@ proc toCodeStmts(
   level: int
 ) = 
   addIndent(self.res, level)
-  #echo "toCodeStmts:"
+  echo "toCodeStmts:"
   #echo repr(nodes)
   ##echo repr(nodes.kind)
-  #echo nodes.treeRepr
+  echo nodes.treeRepr
   proc innerFunc(
     self: var Convert,
     n: NimNode,
