@@ -1854,7 +1854,7 @@ proc toCodeStmts(
     else:
       self.res.addIndent level
       self.innerFunc(nodes, level)
-      self.res.add ';'
+      self.res.addSmart ';'
       self.res.add "\n"
       
 
