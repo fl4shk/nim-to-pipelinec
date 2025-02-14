@@ -149,6 +149,7 @@ proc toCodeIfStmt(
   level = 0
 ) =
   var first: bool = true
+  #echo nodes.treeRepr()
   for n in nodes:
     case n.kind:
     of nnkEmpty:
@@ -160,7 +161,19 @@ proc toCodeIfStmt(
       else:
         first = false
       self.res.add "if "
+      #if n[0].kind != nnkStmtListExpr:
       self.toCodeExpr(n[0], level, false, isVarDecl=false)
+      #elif (
+      #  (
+      #    have(n[0], @[nnkEmpty])
+      #  ) and (
+      #    n.len() == 2
+      #  )
+      #):
+      #  self.toCodeExpr(n[0][1], level, false, isVarDecl=false)
+      #else:
+      #  #let n = n
+      #  fail()
       self.res.add " {\n"
 
       addIndent(self.res, level)
@@ -1395,6 +1408,21 @@ proc toCodeExprInner(
           result.add ")"
       #of nnkCommand:
       #  
+      of nnkStmtListExpr:
+        if (
+          (
+            have(n, @[nnkEmpty])
+          ) and (
+            n.len() == 2
+          )
+        ):
+          result.add self.toCodeExprInner(
+            n[1], level, false, isVarDecl=false
+          )
+        else:
+          echo repr(n)
+          echo n.treeRepr
+          fail()
       else:
         echo repr(n)
         echo n.treeRepr

@@ -100,7 +100,14 @@ proc `minus`*[T](
   #var i: int = 0
   for i in 0 ..< result.v.len():
   #while i < result.v.len():
-    result[i] = left[i] - right[i]
+    if (
+      (
+        i > 0
+      ) and (
+        i < 3
+      )
+    ):
+      result[i] = left[i] - right[i]
   #  i = i + 1
 
   ## example 2:
