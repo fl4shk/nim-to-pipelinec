@@ -1835,7 +1835,7 @@ proc toCodeStmts(
       #self.res.add ";"
       #discard
       self.toCodeStmts(n[0], level)
-      self.res.addSmart ';'
+      self.res.add ';'
     else:
       #echo n
       #echo repr(n)
@@ -1854,7 +1854,7 @@ proc toCodeStmts(
     else:
       self.res.addIndent level
       self.innerFunc(nodes, level)
-      self.res.addSmart ';'
+      self.res.add ';'
       self.res.add "\n"
       
 
