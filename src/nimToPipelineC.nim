@@ -536,6 +536,7 @@ proc toCodeExprInner(
       ):
         result.add tempStr[1]
       else:
+        #result.add "_b"
         result.add tempStr[1].replace("_", "_a")
         result.add "_c"
 
