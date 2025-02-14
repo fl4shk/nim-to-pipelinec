@@ -2242,6 +2242,7 @@ proc procDef(
     else:
       if pass == 0:
         if origProcName notin self.noMangleTbl:
+          echo "test: ", origProcName
           self.noMangleTbl[origProcName] = pragmaFlagArr[pfkNoMangle]
         elif self.noMangleTbl[origProcName]:
           errFail("error: can't have overloading with \"cnomangle\"")
