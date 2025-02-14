@@ -746,7 +746,7 @@ proc toCodeExprInner(
             typeImpl=typeImpl,
             isVarDecl=isVarDecl,
           )
-        #result.add "_d"
+        result.add "_d"
     of nnkUIntLit, nnkUInt8Lit, nnkUInt16Lit, nnkUInt32Lit, nnkUInt64Lit:
       #result.add("((int)" & $n.intVal & ")")
       # (old concept for the transpiler, couldn't get it to work!):
