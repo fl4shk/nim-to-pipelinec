@@ -959,12 +959,32 @@ proc toCodeExprInner(
         isVarDecl=isVarDecl,
       )
       result.add " "
-      if n[0].repr in ["mod"] and n[1].getType().repr != "int":
-        result.add("fmod")
+      if n[0].repr in ["mod"]:
+        if n[1].getType().repr != "int":
+          result.add("fmod")
+        else:
+          result.add "%"
+      elif n[0].repr == "div":
+        result.add "/"
       elif n[0].repr == "shl":
         result.add "<<"
       elif n[0].repr == "shr":
         result.add ">>"
+      elif n[0].repr == "and":
+        if n[1].getType().repr != "bool":
+          result.add "&"
+        else:
+          result.add "&&"
+      elif n[0].repr == "or":
+        if n[1].getType().repr != "bool":
+          result.add "|"
+        else:
+          result.add "||"
+      elif n[0].repr == "xor":
+        #if n[1].getType().repr != "bool":
+        #  result.add "|"
+        #else:
+        result.add "^"
       else:
         result.add(n[0].strVal)
       result.add " "
