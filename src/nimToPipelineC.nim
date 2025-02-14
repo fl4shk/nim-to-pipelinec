@@ -2247,7 +2247,7 @@ proc procDef(
         elif self.noMangleTbl[origProcName]:
           errFail("error: can't have overloading with \"cnomangle\"")
       else: # if pass == 1:
-        #echo "ending? " & procName
+        echo "ending? " & procName
         foundElse = true
         self.res.setLen(0)
         self.res.add "\n"
