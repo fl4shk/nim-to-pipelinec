@@ -1834,10 +1834,10 @@ proc toCodeStmts(
   level: int
 ) = 
   addIndent(self.res, level)
-  echo "toCodeStmts:"
+  #echo "toCodeStmts:"
   #echo repr(nodes)
   ##echo repr(nodes.kind)
-  echo nodes.treeRepr
+  #echo nodes.treeRepr
   proc innerFunc(
     self: var Convert,
     n: NimNode,
@@ -2209,12 +2209,12 @@ proc procDef(
               #echo "kind: ", typeImpl[0][idx].kind
               case typeImpl[0][idx].kind:
               of nnkIdentDefs:
-                echo "temp: "
-                #echo typeImpl[0][0][idx][1].treeRepr
-                #echo typeImpl[0][idx].treeRepr
-                #echo typeImpl[0][idx][1].treeRepr
-                echo typeImpl[0][idx].treeRepr()
-                echo "temp end:"
+                #echo "temp: "
+                ##echo typeImpl[0][0][idx][1].treeRepr
+                ##echo typeImpl[0][idx].treeRepr
+                ##echo typeImpl[0][idx][1].treeRepr
+                #echo typeImpl[0][idx].treeRepr()
+                #echo "temp end:"
                 paramsStr.add(
                   self.funcRenameIter(
                     paramType=(
@@ -2243,12 +2243,12 @@ proc procDef(
     else:
       if pass == 0:
         if origProcName notin self.noMangleTbl:
-          echo "test: ", origProcName
+          #echo "test: ", origProcName
           self.noMangleTbl[origProcName] = pragmaFlagArr[pfkNoMangle]
         elif self.noMangleTbl[origProcName]:
           errFail("error: can't have overloading with \"cnomangle\"")
       else: # if pass == 1:
-        echo "ending? " & procName
+        #echo "ending? " & procName
         foundElse = true
         self.res.setLen(0)
         self.res.add "\n"
