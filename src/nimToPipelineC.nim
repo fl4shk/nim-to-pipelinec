@@ -2335,6 +2335,10 @@ proc findTopLevel(
       echo "----"
       discard
     if n.kind == nnkCall:
+      echo "#----"
+      echo "n.kind == nnkCall:"
+      echo n.treeRepr()
+      echo "----"
       #echo n
       #dumpTree n
       if n[0].repr() == "[]":
@@ -2351,7 +2355,8 @@ proc findTopLevel(
         #  procName in self.funcTbl
         #)
       ):
-        #echo "continuing"
+        echo "continuing"
+        echo "procName in ignoreFuncs"
         continue
 
       case n[0].kind:
