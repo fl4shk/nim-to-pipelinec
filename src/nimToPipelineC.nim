@@ -2495,18 +2495,18 @@ proc findTopLevel(
       pass=pass
     )
 
-  let n = topLevelNode
-  if n.kind != nnkCall:
-    for innerN in n:
-      self.innerFunc(
-        n=innerN,
-        pass=pass
-      )
-  else:
+  #let n = topLevelNode
+  #if topLevelNode.kind != nnkCall:
+  for n in topLevelNode:
     self.innerFunc(
       n=n,
       pass=pass
     )
+  #else:
+  #  self.innerFunc(
+  #    n=topLevelNode,
+  #    pass=pass
+  #  )
 
 
 proc toPipelineCInner*(
