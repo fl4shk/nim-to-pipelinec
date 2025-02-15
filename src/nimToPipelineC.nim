@@ -2338,6 +2338,9 @@ proc findTopLevel(
       #echo n
       #dumpTree n
       if n[0].repr() == "[]":
+        echo "n[0].repr() == \"[]\""
+        echo n[0].treeRepr()
+        echo "----"
         continue
       var procName = n[0].repr()
       if (
