@@ -2326,6 +2326,13 @@ proc findTopLevel(
   #typeImpl: NimNode,
   pass: int,
 ) =
+  if topLevelNode.kind != nnkEmpty:
+    echo "#----"
+    echo "findTopLevel(): topLevelNode.kind outer:"
+    echo topLevelNode.repr
+    echo topLevelNode.treeRepr
+    echo "----"
+    discard
   for n in topLevelNode:
     if n.kind != nnkEmpty:
       echo "#----"
@@ -2407,8 +2414,8 @@ proc findTopLevel(
           continue
 
         var myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=pass)
-        if myProcDef[0] == "sqrt":
-          echo "sqrt pre:"
+        if myProcDef[0] == "slash":
+          echo "slash pre:"
           echo "pass:", pass
           echo n[0].treeRepr
           echo impl.treeRepr
@@ -2420,8 +2427,8 @@ proc findTopLevel(
           pass=pass,
         )
 
-        if myProcDef[0] == "sqrt":
-          echo "sqrt post:"
+        if myProcDef[0] == "slash":
+          echo "slash post:"
           echo "pass:", pass
           echo n[0].treeRepr
           echo impl.treeRepr
