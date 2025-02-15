@@ -62,7 +62,13 @@ macro errFail(
   result = quote do:
     assert(
       false,
-      `msg`,
+      (
+        $n.kind & " " & repr(n) & "\n"
+      ) & (
+        n.treeRepr & "\n"
+      ) & (
+        `msg`
+      ),
     )
 #macro fail(
 #  n: untyped
