@@ -44,6 +44,7 @@ type
     regularC: bool
     cppConstRefInp: bool
     noMangleTbl: Table[string, bool]
+    noMangleProtoTbl: Table[string, string]
 
 macro fail(): untyped =
   result = quote do:
@@ -2246,15 +2247,30 @@ proc procDef(
         if origProcName notin self.noMangleTbl:
           #echo "test: ", origProcName
           self.noMangleTbl[origProcName] = pragmaFlagArr[pfkNoMangle]
-        elif self.noMangleTbl[origProcName]:
-          errFail("error: can't have overloading with \"cnomangle\"")
+          #if origProcName notin self.noMangleProtoTbl:
+          #  self.noMangleProtoTbl[origProcName] = (
+          #    paramsStr
+          #  )
+          self.noMangleProtoTbl[origProcName] = ""
+        #elif self.noMangleTbl[origProcName]:
+        #  errFail("error: can't have overloading with \"cnomangle\"")
       else: # if pass == 1:
         #echo "ending? " & procName
         foundElse = true
         self.res.setLen(0)
         self.res.add "\n"
+        let tempProcName = procName & "_g" & returnType 
+        if self.noMangleTbl[origProcName]:
+          let proto = self.noMangleProtoTbl[origProcName]
+          if proto.len() == 0:
+            self.noMangleProtoTbl[origProcName] = tempProcName
+          elif proto != tempProcName:
+            errFail(
+              "error: can't have overloading with \"cnomangle\""
+            )
+
         if not pragmaFlagArr[pfkNoMangle]:
-          procName = procName & "_g" & returnType
+          procName = tempProcName
         else:
           procName = origProcName
         #procName = procName & "_" & returnType
