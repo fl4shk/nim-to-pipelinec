@@ -65,8 +65,9 @@ macro errFail(
       (
         $n.kind & " " & repr(n) & "\n"
       ) & (
-        n.treeRepr & "\n"
-      ) & (
+      #  n.treeRepr & "\n"
+      #) 
+      #& (
         `msg`
       ),
     )
@@ -2035,13 +2036,16 @@ proc procDef(
           pragmaFlagArr[pfkStatic]
         )
       ):
-        errFail(
-          (
-            "error: can't have both \"cextern\" and \"cstatic\" "
-          ) & (
-            "for a `proc`/`func`"
+        defer:
+          errFail(
+            (
+              "error: can't have both \"cextern\" and \"cstatic\" "
+            ) & (
+              "for a `proc`/`func`: "
+            ) & (
+              origProcName
+            )
           )
-        )
       #if (
       #  not (
       #    (
@@ -2064,13 +2068,16 @@ proc procDef(
         )
       ):
         #echo "error: can't have generics with \"cnomangle\""
-        errFail(
-          (
-            "error: can't have generics with "
-          ) & (
-            "\"cextern\" and/or \"cnomangle\""
+        defer:
+          errFail(
+            (
+              "error: can't have generics with "
+            ) & (
+              "\"cextern\" and/or \"cnomangle\": "
+            ) & (
+              origProcName
+            )
           )
-        )
     of nnkSym:
       procName = $n
       origProcName = procName
@@ -2094,13 +2101,16 @@ proc procDef(
         #echo "haveNoMangle: ", haveNoMangle
         if pragmaFlagArr[pfkExtern] or pragmaFlagArr[pfkNoMangle]:
           #echo "error: can't have generics with \"cnomangle\""
-          errFail(
-            (
-              "error: can't have generics with "
-            ) & (
-              "\"cextern\" and/or \"cnomangle\""
+          defer:
+            errFail(
+              (
+                "error: can't have generics with "
+              ) & (
+                "\"cextern\" and/or \"cnomangle\": "
+              ) & (
+                origProcName
+              )
             )
-          )
         let n = n[1]
         haveGenerics = true
         if n[0].kind == nnkIdentDefs:
@@ -2271,9 +2281,14 @@ proc procDef(
           if proto.len() == 0:
             self.noMangleProtoTbl[origProcName] = tempProcName
           elif proto != tempProcName:
-            errFail(
-              "error: can't have overloading with \"cnomangle\""
-            )
+            defer:
+              errFail(
+                (
+                  "error: can't have overloading with \"cnomangle\": "
+                ) & (
+                  tempProcName
+                )
+              )
 
         if not pragmaFlagArr[pfkNoMangle]:
           procName = tempProcName
