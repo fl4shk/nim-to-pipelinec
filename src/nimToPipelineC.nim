@@ -2458,10 +2458,10 @@ proc findTopLevel(
             #  fail()
             #else:
             continue
-          #echo "adding this function:"
-          #echo procName
-          #echo myProcDef[0]
-          #echo myProcDef[1]
+          echo "adding this function:"
+          echo procName
+          echo myProcDef[0]
+          echo myProcDef[1]
           #echo "..."
           self.funcSeq.add myProcDef[1]
           self.funcTbl[myProcDef[0]] = FuncTblElem(
