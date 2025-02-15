@@ -2324,6 +2324,7 @@ proc findTopLevel(
   self: var Convert,
   topLevelNode: NimNode,
   #typeImpl: NimNode,
+  pass: int,
 ) =
   for n in topLevelNode:
     if n.kind != nnkEmpty:
@@ -2395,63 +2396,66 @@ proc findTopLevel(
           #echo "other tempImpl:"
           #echo tempImpl.treeRepr
 
-        var myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=0)
+        var myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=pass)
 
         #let innerProcName = myProcDef[0]
 
         self.findTopLevel(
-          impl#, innerTypeImpl
+          impl,#, innerTypeImpl
+          pass=pass,
         )
-        myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=1)
+        #myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=pass)
 
-        if (
-          (
-            myProcDef[0] in ignoreFuncs
-          ) or (
-            myProcDef[0] in self.funcTbl
-          ) or (
-            not myProcDef[2]
-          )
-        ):
-          #echo "continuing 2:"
-          #echo "first cond: ", innerProcName in ignoreFuncs
-          #echo "second cond: ", innerProcName in self.funcTbl
+        if pass == 1:
+          if (
+            (
+              myProcDef[0] in ignoreFuncs
+            ) or (
+              myProcDef[0] in self.funcTbl
+            ) or (
+              not myProcDef[2]
+            )
+          ):
+            #echo "continuing 2:"
+            #echo "first cond: ", innerProcName in ignoreFuncs
+            #echo "second cond: ", innerProcName in self.funcTbl
+            #echo procName
+            #echo myProcDef[0]
+            #echo myProcDef[1]
+            #echo "..."
+            #var cond: bool = true
+            #if cond:
+            #  cond = myProcDef[0] in self.funcTbl
+            #if cond:
+            #  cond = self.funcTbl[myProcDef[0]].doMangle
+            #if cond:
+            #  #cond =
+            #  discard
+
+            #if cond:
+            #  fail()
+            #else:
+            continue
+          #echo "adding this function:"
           #echo procName
           #echo myProcDef[0]
           #echo myProcDef[1]
           #echo "..."
-          #var cond: bool = true
-          #if cond:
-          #  cond = myProcDef[0] in self.funcTbl
-          #if cond:
-          #  cond = self.funcTbl[myProcDef[0]].doMangle
-          #if cond:
-          #  #cond =
-          #  discard
-
-          #if cond:
-          #  fail()
-          #else:
-          continue
-        #echo "adding this function:"
-        #echo procName
-        #echo myProcDef[0]
-        #echo myProcDef[1]
-        #echo "..."
-        self.funcSeq.add myProcDef[1]
-        self.funcTbl[myProcDef[0]] = FuncTblElem(
-          #doMangle: not self.noMangleTbl[^1],
-          defn: self.funcSeq[^1],
-        )
-        #if self.procRenameTbl.len > 0:
-        #  discard self.procRenameTbl.pop()
+          self.funcSeq.add myProcDef[1]
+          self.funcTbl[myProcDef[0]] = FuncTblElem(
+            #doMangle: not self.noMangleTbl[^1],
+            defn: self.funcSeq[^1],
+          )
+          #if self.procRenameTbl.len > 0:
+          #  discard self.procRenameTbl.pop()
       else:
         #echo "test in findTopLevel() 1"
         #echo repr(n[0])
         discard
 
     self.findTopLevel(
-      n#, typeImpl
+      n,#, typeImpl
+      pass=pass
     )
 
 
@@ -2488,7 +2492,8 @@ proc toPipelineCInner*(
   var convert: Convert
   convert.regularC = ($regularC == "true")
   convert.cppConstRefInp = ($cppConstRefInp == "true")
-  convert.findTopLevel(n)
+  for pass in 0 .. 1:
+    convert.findTopLevel(n, pass=pass)
   #echo convert.funcTbl
   #echo convert.typedefTbl
   #var globals: Table[string, string]
