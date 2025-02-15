@@ -2417,13 +2417,14 @@ proc findTopLevel(
               not myProcDef[2]
             )
           ):
-            #echo "continuing 2:"
+            echo "continuing 2:"
             #echo "first cond: ", innerProcName in ignoreFuncs
             #echo "second cond: ", innerProcName in self.funcTbl
-            #echo procName
-            #echo myProcDef[0]
-            #echo myProcDef[1]
-            #echo "..."
+            echo procName
+            echo myProcDef[0]
+            echo myProcDef[1]
+            echo myProcDef[2]
+            echo "..."
             #var cond: bool = true
             #if cond:
             #  cond = myProcDef[0] in self.funcTbl
