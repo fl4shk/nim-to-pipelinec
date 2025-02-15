@@ -2333,7 +2333,11 @@ proc findTopLevel(
     echo topLevelNode.treeRepr
     echo "----"
     discard
-  for n in topLevelNode:
+  proc innerFunc(
+    self: var Convert,
+    n: NimNode,
+    pass: int,
+  ) = 
     if n.kind != nnkEmpty:
       echo "#----"
       echo "findTopLevel(): n.kind outer:"
@@ -2352,7 +2356,8 @@ proc findTopLevel(
         echo "n[0].repr() == \"[]\""
         echo n[0].treeRepr()
         echo "----"
-        continue
+        #continue
+        return
       var procName = n[0].repr()
       if (
         (
@@ -2364,7 +2369,8 @@ proc findTopLevel(
       ):
         echo "continuing"
         echo "procName in ignoreFuncs"
-        continue
+        #continue
+        return
 
       case n[0].kind:
       of nnkIdent:
@@ -2411,7 +2417,8 @@ proc findTopLevel(
           #echo tempImpl.treeRepr
           echo n[0].treeRepr
           echo impl.treeRepr
-          continue
+          #continue
+          return
 
         var myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=pass)
         if myProcDef[0] == "slash":
@@ -2464,7 +2471,8 @@ proc findTopLevel(
             #if cond:
             #  fail()
             #else:
-            continue
+            #continue
+            return
           echo "adding this function:"
           echo procName
           echo myProcDef[0]
@@ -2484,6 +2492,19 @@ proc findTopLevel(
 
     self.findTopLevel(
       n,#, typeImpl
+      pass=pass
+    )
+
+  let n = topLevelNode
+  if n.kind != nnkCall:
+    for innerN in n:
+      self.innerFunc(
+        n=innerN,
+        pass=pass
+      )
+  else:
+    self.innerFunc(
+      n=n,
       pass=pass
     )
 
