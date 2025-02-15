@@ -2394,10 +2394,16 @@ proc findTopLevel(
           #tempImpl = n
           echo "other impl:"
           #echo tempImpl.treeRepr
+          echo n[0].treeRepr
           echo impl.treeRepr
           continue
 
         var myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=pass)
+        if myProcDef[0] == "sqrt":
+          echo "sqrt pre:"
+          echo "pass:", pass
+          echo n[0].treeRepr
+          echo impl.treeRepr
 
         #let innerProcName = myProcDef[0]
 
@@ -2405,6 +2411,12 @@ proc findTopLevel(
           impl,#, innerTypeImpl
           pass=pass,
         )
+
+        if myProcDef[0] == "sqrt":
+          echo "sqrt post:"
+          echo "pass:", pass
+          echo n[0].treeRepr
+          echo impl.treeRepr
         #myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=pass)
 
         if pass == 1:
