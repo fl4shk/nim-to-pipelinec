@@ -2387,22 +2387,22 @@ proc findTopLevel(
         #echo n[0].symKind()
         let impl = n[0].getImpl()
         let innerTypeImpl = n[0].getTypeImpl()
-        #let innerTypeInst = n[0].getTypeInst()
-        #let innerType = n[0].getType()
-        ##echo repr(impl)
-        #echo "impl.treeRepr:"
-        #echo impl.treeRepr
-        #echo ""
-        #echo "innerTypeImpl.treeRepr:"
-        #echo innerTypeImpl.treeRepr
-        #echo ""
-        #echo n[0].repr()
-        #echo "innerTypeInst.treeRepr:"
-        #echo innerTypeInst.treeRepr
-        #echo ""
-        #echo "innerType.treeRepr:"
-        #echo innerType.treeRepr
-        #echo "--------"
+        let innerTypeInst = n[0].getTypeInst()
+        let innerType = n[0].getType()
+        #echo repr(impl)
+        echo "impl.treeRepr:"
+        echo impl.treeRepr
+        echo ""
+        echo "innerTypeImpl.treeRepr:"
+        echo innerTypeImpl.treeRepr
+        echo ""
+        echo n[0].repr()
+        echo "innerTypeInst.treeRepr:"
+        echo innerTypeInst.treeRepr
+        echo ""
+        echo "innerType.treeRepr:"
+        echo innerType.treeRepr
+        echo "--------"
         #self.nextProcRenameTbl(typeImpl)
 
         #self.noMangleTbl.add false
@@ -2498,6 +2498,7 @@ proc findTopLevel(
   #let n = topLevelNode
   #if topLevelNode.kind != nnkCall:
   for n in topLevelNode:
+    echo "for n in topLevelNode:"
     self.innerFunc(
       n=n,
       pass=pass
