@@ -2328,11 +2328,11 @@ proc findTopLevel(
 ) =
   for n in topLevelNode:
     if n.kind != nnkEmpty:
-      #echo "#----"
-      #echo "findTopLevel(): n.kind outer:"
-      #echo n.repr
-      #echo n.treeRepr
-      #echo "----"
+      echo "#----"
+      echo "findTopLevel(): n.kind outer:"
+      echo n.repr
+      echo n.treeRepr
+      echo "----"
       discard
     if n.kind == nnkCall:
       #echo n
@@ -2389,12 +2389,13 @@ proc findTopLevel(
         if impl.kind != nnkTemplateDef:
           tempImpl = impl
         else:
-          continue
           ##tempImpl = innerTypeImpl
           ##tempImpl = n.getTypeInst()
           #tempImpl = n
-          #echo "other tempImpl:"
+          echo "other impl:"
           #echo tempImpl.treeRepr
+          echo impl.treeRepr
+          continue
 
         var myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=pass)
 
