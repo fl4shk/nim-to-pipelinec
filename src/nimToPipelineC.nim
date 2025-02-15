@@ -221,13 +221,14 @@ proc toCodeForStmt(
   if have(n, @[nnkSym, nnkInfix]):
     let mySym = n[0].repr()
     addIndent(self.res, level)
-    self.res.add "{\n"
+    #self.res.add "{\n"
     addIndent(self.res, level)
-    self.res.add "int32_t "
-    self.res.add mySym
-    self.res.add ";\n"
+    #self.res.add "int32_t "
+    #self.res.add mySym
+    #self.res.add ";\n"
     addIndent(self.res, level)
     self.res.add "for ("
+    self.res.add "int32_t "
     self.res.add mySym
     self.res.add "="
     #echo "#----"
@@ -288,8 +289,8 @@ proc toCodeForStmt(
           level=level #+ 1
         )
       self.res.addIndent(level)
-      self.res.add "}\n"
-      self.res.addIndent(level)
+      #self.res.add "}\n"
+      #self.res.addIndent(level)
       self.res.add "}"
     else:
       fail()
