@@ -2489,6 +2489,11 @@ proc findTopLevel(
         #echo "test in findTopLevel() 1"
         #echo repr(n[0])
         discard
+      for innerN in n[1 .. ^1]:
+        self.findTopLevel(
+          innerN,
+          pass=pass
+        )
 
     self.findTopLevel(
       n,#, typeImpl
