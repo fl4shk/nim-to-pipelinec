@@ -2326,36 +2326,36 @@ proc findTopLevel(
   #typeImpl: NimNode,
   pass: int,
 ) =
-  if topLevelNode.kind != nnkEmpty:
-    echo "#----"
-    echo "findTopLevel(): topLevelNode.kind outer:"
-    echo topLevelNode.repr
-    echo topLevelNode.treeRepr
-    echo "----"
-    discard
+  #if topLevelNode.kind != nnkEmpty:
+  #  echo "#----"
+  #  echo "findTopLevel(): topLevelNode.kind outer:"
+  #  echo topLevelNode.repr
+  #  echo topLevelNode.treeRepr
+  #  echo "----"
+  #  discard
   proc innerFunc(
     self: var Convert,
     n: NimNode,
     pass: int,
   ) = 
     if n.kind != nnkEmpty:
-      echo "#----"
-      echo "findTopLevel(): n.kind outer:"
-      echo n.repr
-      echo n.treeRepr
-      echo "----"
+      #echo "#----"
+      #echo "findTopLevel(): n.kind outer:"
+      #echo n.repr
+      #echo n.treeRepr
+      #echo "----"
       discard
     if n.kind == nnkCall:
-      echo "#----"
-      echo "n.kind == nnkCall:"
-      echo n.treeRepr()
-      echo "----"
+      #echo "#----"
+      #echo "n.kind == nnkCall:"
+      #echo n.treeRepr()
+      #echo "----"
       #echo n
       #dumpTree n
       if n[0].repr() == "[]":
-        echo "n[0].repr() == \"[]\""
-        echo n[0].treeRepr()
-        echo "----"
+        #echo "n[0].repr() == \"[]\""
+        #echo n[0].treeRepr()
+        #echo "----"
         #continue
         return
       var procName = n[0].repr()
@@ -2367,8 +2367,8 @@ proc findTopLevel(
         #  procName in self.funcTbl
         #)
       ):
-        echo "continuing"
-        echo "procName in ignoreFuncs"
+        #echo "continuing"
+        #echo "procName in ignoreFuncs"
         #continue
         return
 
@@ -2387,22 +2387,22 @@ proc findTopLevel(
         #echo n[0].symKind()
         let impl = n[0].getImpl()
         let innerTypeImpl = n[0].getTypeImpl()
-        let innerTypeInst = n[0].getTypeInst()
-        let innerType = n[0].getType()
+        #let innerTypeInst = n[0].getTypeInst()
+        #let innerType = n[0].getType()
         #echo repr(impl)
-        echo "impl.treeRepr:"
-        echo impl.treeRepr
-        echo ""
-        echo "innerTypeImpl.treeRepr:"
-        echo innerTypeImpl.treeRepr
-        echo ""
-        echo n[0].repr()
-        echo "innerTypeInst.treeRepr:"
-        echo innerTypeInst.treeRepr
-        echo ""
-        echo "innerType.treeRepr:"
-        echo innerType.treeRepr
-        echo "--------"
+        #echo "impl.treeRepr:"
+        #echo impl.treeRepr
+        #echo ""
+        #echo "innerTypeImpl.treeRepr:"
+        #echo innerTypeImpl.treeRepr
+        #echo ""
+        #echo n[0].repr()
+        #echo "innerTypeInst.treeRepr:"
+        #echo innerTypeInst.treeRepr
+        #echo ""
+        #echo "innerType.treeRepr:"
+        #echo innerType.treeRepr
+        #echo "--------"
         #self.nextProcRenameTbl(typeImpl)
 
         #self.noMangleTbl.add false
@@ -2410,22 +2410,22 @@ proc findTopLevel(
         if impl.kind != nnkTemplateDef:
           tempImpl = impl
         else:
-          ##tempImpl = innerTypeImpl
-          ##tempImpl = n.getTypeInst()
-          #tempImpl = n
-          echo "other impl:"
-          #echo tempImpl.treeRepr
-          echo n[0].treeRepr
-          echo impl.treeRepr
-          #continue
+          ###tempImpl = innerTypeImpl
+          ###tempImpl = n.getTypeInst()
+          ##tempImpl = n
+          #echo "other impl:"
+          ##echo tempImpl.treeRepr
+          #echo n[0].treeRepr
+          #echo impl.treeRepr
+          ##continue
           return
 
         var myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=pass)
-        if myProcDef[0] == "slash":
-          echo "slash pre:"
-          echo "pass:", pass
-          echo n[0].treeRepr
-          echo impl.treeRepr
+        #if myProcDef[0] == "slash":
+        #  echo "slash pre:"
+        #  echo "pass:", pass
+        #  echo n[0].treeRepr
+        #  echo impl.treeRepr
 
         #let innerProcName = myProcDef[0]
 
@@ -2434,11 +2434,11 @@ proc findTopLevel(
           pass=pass,
         )
 
-        if myProcDef[0] == "slash":
-          echo "slash post:"
-          echo "pass:", pass
-          echo n[0].treeRepr
-          echo impl.treeRepr
+        #if myProcDef[0] == "slash":
+        #  echo "slash post:"
+        #  echo "pass:", pass
+        #  echo n[0].treeRepr
+        #  echo impl.treeRepr
         #myProcDef = self.procDef(tempImpl, innerTypeImpl, pass=pass)
 
         if pass == 1:
@@ -2451,32 +2451,32 @@ proc findTopLevel(
               not myProcDef[2]
             )
           ):
-            echo "continuing 2:"
-            #echo "first cond: ", innerProcName in ignoreFuncs
-            #echo "second cond: ", innerProcName in self.funcTbl
-            echo procName
-            echo myProcDef[0]
-            echo myProcDef[1]
-            echo myProcDef[2]
-            echo "..."
-            #var cond: bool = true
-            #if cond:
-            #  cond = myProcDef[0] in self.funcTbl
-            #if cond:
-            #  cond = self.funcTbl[myProcDef[0]].doMangle
-            #if cond:
-            #  #cond =
-            #  discard
+            #echo "continuing 2:"
+            ##echo "first cond: ", innerProcName in ignoreFuncs
+            ##echo "second cond: ", innerProcName in self.funcTbl
+            #echo procName
+            #echo myProcDef[0]
+            #echo myProcDef[1]
+            #echo myProcDef[2]
+            #echo "..."
+            ##var cond: bool = true
+            ##if cond:
+            ##  cond = myProcDef[0] in self.funcTbl
+            ##if cond:
+            ##  cond = self.funcTbl[myProcDef[0]].doMangle
+            ##if cond:
+            ##  #cond =
+            ##  discard
 
-            #if cond:
-            #  fail()
-            #else:
-            #continue
+            ##if cond:
+            ##  fail()
+            ##else:
+            ##continue
             return
-          echo "adding this function:"
-          echo procName
-          echo myProcDef[0]
-          echo myProcDef[1]
+          #echo "adding this function:"
+          #echo procName
+          #echo myProcDef[0]
+          #echo myProcDef[1]
           #echo "..."
           self.funcSeq.add myProcDef[1]
           self.funcTbl[myProcDef[0]] = FuncTblElem(
@@ -2503,7 +2503,7 @@ proc findTopLevel(
   #let n = topLevelNode
   #if topLevelNode.kind != nnkCall:
   for n in topLevelNode:
-    echo "for n in topLevelNode:"
+    #echo "for n in topLevelNode:"
     self.innerFunc(
       n=n,
       pass=pass
