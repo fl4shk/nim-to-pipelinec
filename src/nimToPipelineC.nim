@@ -838,8 +838,8 @@ proc toCodeExprInner(
         else:
           fail()
       else: # if not haveArray
-        echo "not getHaveArray(someN=n):"
-        echo n.treeRepr()
+        #echo "not getHaveArray(someN=n):"
+        #echo n.treeRepr()
         case n[0].kind:
         of nnkIdent, nnkSym:
           if typeImpl != nil:
