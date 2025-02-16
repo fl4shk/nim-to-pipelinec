@@ -253,6 +253,7 @@ proc myOuterOuterMain(): AluOutp[Vec3[int]] =
   var a = mkVec3(x=1, y=2, z=3)
   let b = mkVec3[int](x=7, y=9, z=2)
   let op = aokAdd
+  var temp: array[2, uint8] = [1, 2]
   result = myOuterMain(
     a=(a),
     b=b,
