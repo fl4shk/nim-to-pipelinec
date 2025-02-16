@@ -131,7 +131,7 @@ type
   AluOpKind* = enum
     aokAdd,
     aokSub,
-    aokFakeAnd,
+    #aokFakeAnd,
 
 type
   AluInp*[T] = object
