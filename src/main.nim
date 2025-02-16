@@ -237,7 +237,7 @@ proc myOuterMain(
 ): AluOutp[Vec3[int]] =
   #result = myMain(a=a, b=b, op=op)
   #echo myTreeRepr(a)
-  let tempA = mkVec3[int](a.x, a.y, a.z)
+  let tempA {.cstatic.} = mkVec3[int](a.x, a.y, a.z)
   var aluInp = AluInp[Vec3[int]](
     #a: a[],
     a: tempA,
