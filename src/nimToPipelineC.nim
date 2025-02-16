@@ -168,7 +168,7 @@ proc toCodeIfStmt(
         self.res.add "else "
       else:
         first = false
-      self.res.add "if "
+      self.res.add "if ("
       #if n[0].kind != nnkStmtListExpr:
       self.toCodeExpr(n[0], level, false, isVarDecl=false)
       #elif (
@@ -182,7 +182,7 @@ proc toCodeIfStmt(
       #else:
       #  #let n = n
       #  fail()
-      self.res.add " {\n"
+      self.res.add ") {\n"
 
       addIndent(self.res, level)
       self.toCodeStmts(n[1], level)
@@ -196,6 +196,142 @@ proc toCodeIfStmt(
       self.res.add "}\n"
     else:
       fail()
+proc toCodeSwitchStmt(
+  self: var Convert,
+  nodes: NimNode,
+  level = 0
+) =
+  #let n = nodes
+  #echo "switch:"
+  #echo nodes.treeRepr()
+  if self.regularC:
+    self.res.addIndent(level)
+    self.res.add "switch ("
+    self.toCodeExpr(
+      nodes=nodes[0],
+      level=level,
+      isLhs=false,
+      isTypeInst=false,
+      isVarDecl=false,
+    )
+    self.res.add ") {\n"
+    for n in nodes[1 .. ^1]:
+      self.res.addIndent(level)
+      case n.kind:
+      of nnkOfBranch:
+        self.res.add "case "
+        self.toCodeExpr(
+          nodes=n[0],
+          level=level,
+          isLhs=false,
+          isTypeInst=false,
+          isVarDecl=false,
+        )
+        self.res.add ":\n"
+        if n.len() > 2:
+          for ofN in n[1 ..< ^1]:
+            self.res.addIndent(level)
+            self.res.add "case "
+            self.toCodeExpr(
+              nodes=n[0],
+              level=level,
+              isLhs=false,
+              isTypeInst=false,
+              isVarDecl=false,
+            )
+            self.res.add ":\n"
+        #self.toCodeStmts(
+        #  nodes=n[^1],
+        #  level=level + 1
+        #)
+      of nnkElse:
+        self.res.add "default:\n"
+      else:
+        echo n.treeRepr()
+        fail()
+      self.toCodeStmts(
+        nodes=n[^1],
+        level=level #+ 1
+      )
+      self.res.addIndent(level + 1)
+      self.res.add "break;\n"
+    self.res.addIndent(level)
+    self.res.add "}\n"
+  else: # if not self.regularC:
+    let myLhs = self.toCodeExprInner(
+      nodes=nodes[0],
+      level=level,
+      isLhs=false,
+      isTypeInst=false,
+      isVarDecl=false,
+    )
+    var first: bool = true
+    for n in nodes[1 .. ^1]:
+      #echo "for loop:", nodes[1 .. ^1].len()
+      #echo n.treeRepr()
+      #echo "--------"
+      self.res.addIndent(level)
+      case n.kind:
+      of nnkOfBranch:
+        if first:
+          first = false
+        else:
+          self.res.add "else "
+        self.res.add "if ("
+        #for innerN in n[0 ..< ^1]:
+        for i in 0 ..< n.len() - 1:
+          #if i > 0:
+          self.res.addIndent(level + 1)
+          if n.len() > 2:
+            #self.res.add "\n"
+            if i > 0:
+              self.res.add "|| "
+            self.res.add "("
+          else:
+            self.res.addIndent(level)
+          #self.res.add "("
+          self.res.add myLhs
+          self.res.add " == "
+          self.toCodeExpr(
+            nodes=n[i],
+            level=level,
+            islhs=false,
+            isTypeInst=false,
+            isVarDecl=false,
+          )
+          #if i > 0: #
+          if n.len() > 2:
+            self.res.add ")\n"
+        self.res.addIndent(level)
+        self.res.add ") {\n"
+        self.toCodeStmts(
+          nodes=n[^1],
+          level=level,
+        )
+        self.res.addIndent(level)
+        self.res.add "}\n"
+      of nnkElse:
+        #if nodes[1 .. ^1].len() > 1:
+        if nodes.len() > 2:
+          self.res.add "else {\n"
+          self.toCodeStmts(
+            nodes=n[^1],
+            level=level,
+          )
+          self.res.addIndent(level)
+          self.res.add "}\n"
+        else:
+          #echo "test: ", nodes.len()
+          self.res.add "{\n"
+          self.toCodeStmts(
+            nodes=n[^1],
+            level=level,
+          )
+          self.res.addIndent(level)
+          self.res.add "}\n"
+      else:
+        echo n.treeRepr()
+        fail()
 proc toCodeWhileStmt(
   self: var Convert,
   nodes: NimNode,
@@ -203,7 +339,7 @@ proc toCodeWhileStmt(
 ) =
   let n = nodes
   self.res.addIndent(level)
-  self.res.add "while "
+  self.res.add "while ("
   self.toCodeExpr(
     nodes=n[0],
     level=level,
@@ -211,7 +347,7 @@ proc toCodeWhileStmt(
     isTypeInst=false,
     isVarDecl=false,
   )
-  self.res.add " {\n"
+  self.res.add ") {\n"
   for innerN in n[1 .. ^1]:
     self.toCodeStmts(
       nodes=innerN,
@@ -702,7 +838,8 @@ proc toCodeExprInner(
         else:
           fail()
       else: # if not haveArray
-        #echo "not getHaveArray(someN=n):"
+        echo "not getHaveArray(someN=n):"
+        echo n.treeRepr()
         case n[0].kind:
         of nnkIdent, nnkSym:
           if typeImpl != nil:
@@ -730,32 +867,34 @@ proc toCodeExprInner(
             isVarDecl=isVarDecl,
           )
         result.add "_b"
-        case n[1].kind:
-        of nnkIdent, nnkSym:
-          if typeImpl != nil:
-            #echo "n[1].kind == nnkIdent, nnkSym"
-            #echo typeImpl[1].treeRepr
-            result.add innerHandleIdentSym(
-              someN=n[1],
-              someIsSingle=false,
-              someTypeImpl=typeImpl[1],
-            )
+        for i in 1 ..< n.len():
+          case n[i].kind:
+          of nnkIdent, nnkSym:
+            if typeImpl != nil:
+              #echo "n[i].kind == nnkIdent, nnkSym"
+              #echo typeImpl[i].treeRepr
+              result.add innerHandleIdentSym(
+                someN=n[i],
+                someIsSingle=false,
+                someTypeImpl=typeImpl[i],
+              )
+            else:
+              result.add innerHandleIdentSym(
+                someN=n[i],
+                someIsSingle=false,
+                someTypeImpl=nil
+              )
           else:
-            result.add innerHandleIdentSym(
-              someN=n[1],
-              someIsSingle=false,
-              someTypeImpl=nil
+            result.add self.toCodeExprInner(
+              nodes=n[i],
+              level=level,
+              isLhs=isLhs,
+              isTypeInst=true,
+              isSingle=false,
+              typeImpl=typeImpl,
+              isVarDecl=isVarDecl,
             )
-        else:
-          result.add self.toCodeExprInner(
-            nodes=n[1],
-            level=level,
-            isLhs=isLhs,
-            isTypeInst=true,
-            isSingle=false,
-            typeImpl=typeImpl,
-            isVarDecl=isVarDecl,
-          )
+          #result.add "_c"
         result.add "_d"
     of nnkUIntLit, nnkUInt8Lit, nnkUInt16Lit, nnkUInt32Lit, nnkUInt64Lit:
       #result.add("((int)" & $n.intVal & ")")
@@ -1866,6 +2005,9 @@ proc toCodeStmts(
     of nnkIfStmt:
       self.toCodeIfStmt(n, level + 1)
       #discard
+    of nnkCaseStmt:
+      #echo n.treeRepr()
+      self.toCodeSwitchStmt(n, level + 1)
     of nnkWhileStmt:
       self.toCodeWhileStmt(n, level + 1)
     of nnkForStmt:

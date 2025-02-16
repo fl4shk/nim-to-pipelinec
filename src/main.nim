@@ -131,10 +131,12 @@ type
   AluOpKind* = enum
     aokAdd,
     aokSub,
+    aokFakeAnd,
 
 type
-  AluInp*[T] = object
-    a*, b*: T
+  AluInp*[T, U] = object
+    a*: T
+    b*: U
     op*: AluOpKind
 
 type
@@ -149,13 +151,19 @@ type
 #      result.ret = inp.a + inp.b
 #    else:
 #      result.ret = inp.a - inp.b
-proc `alu`*[T](
-  inp: AluInp[T]
-): AluOutp[T] {.cstatic.} =
-  if inp.op == aokAdd:
-    result.ret = inp.a + inp.b
+proc `alu`*[T, U](
+  inp {.cconst.}: AluInp[T, U]
+): AluOutp[T] =
+  #if inp.op == aokAdd:
+  #  result.ret = inp.a + inp.b
+  #else:
+  #  result.ret = inp.a - inp.b
+  case inp.op:
+  #of aokAdd, aokSub:#, aokFakeAnd:
+  #  result.ret = inp.a + inp.b
+  #  result.ret = result.ret + inp.a
   else:
-    result.ret = inp.a - inp.b
+    result.ret = inp.a #- inp.b
 
 #proc `myVec3IntAlu`*(
 #  inp: AluInp[Vec3[int]]
@@ -186,7 +194,7 @@ proc myMain(
   #a: Vec3[int],
   #b: Vec3[int],
   #op: AluOpKind,
-  inp: AluInp[Vec3[int]]
+  inp: AluInp[Vec3[int], Vec3[uint]]
 ): AluOutp[Vec3[int]] {.cnomangle,craw: part,cmainmhz: "300.0".} =
   #{.craw: myPragmaStr.}
   #let a: Vec3[int] = mkVec3[int](x=1, y=2, z=3)
@@ -224,13 +232,13 @@ proc myMain(
 
 proc myOuterMain(
   a: Vec3[int],
-  b: Vec3[int],
+  b: Vec3[uint],
   op: AluOpKind,
 ): AluOutp[Vec3[int]] =
   #result = myMain(a=a, b=b, op=op)
   #echo myTreeRepr(a)
   let tempA = mkVec3[int](a.x, a.y, a.z)
-  var aluInp = AluInp[Vec3[int]](
+  var aluInp = AluInp[Vec3[int], Vec3[uint]](
     #a: a[],
     a: tempA,
     b: b,
@@ -243,7 +251,7 @@ proc myOuterMain(
 #let op: AluOpKind = aokAdd
 proc myOuterOuterMain(): AluOutp[Vec3[int]] =
   var a = mkVec3(x=1, y=2, z=3)
-  let b = mkVec3(x=7, y=9, z=2)
+  let b = mkVec3[uint](x=7, y=9, z=2)
   let op = aokAdd
   result = myOuterMain(
     a=(a),
@@ -258,6 +266,7 @@ proc myOuterOuterOuterMain(): AluOutp[Vec3[int]] =
   )
 #echo toPipelineC(myOuterMain)
 #echo toPipelineC(myOuterOuterMain)
+
 echo toPipelineC(
   myOuterOuterOuterMain,
   regularC=false,
@@ -265,6 +274,10 @@ echo toPipelineC(
 )
 #echo myOuterOuterOuterMain()
 
+#let a = 3
+#case a:
+#else:
+#  echo a
 #
 #type
 #  Vec2I = object
