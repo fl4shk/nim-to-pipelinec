@@ -1805,13 +1805,13 @@ proc toCodeVarSection(
         self.res.add tempToAdd
         #echo "post n[0]"
         if temp:
-          echo "past self.hadArray:"
-          echo n.treeRepr
-          echo n[1].treeRepr
-          echo "----"
-          echo tempN.treeRepr
-          echo tempN[1].treeRepr
-          echo "----"
+          #echo "past self.hadArray:"
+          #echo n.treeRepr
+          #echo n[1].treeRepr
+          #echo "----"
+          #echo tempN.treeRepr
+          #echo tempN[1].treeRepr
+          #echo "----"
           self.res.add self.toCodeExprInner(
             tempN[1].getTypeInst(),
             level, isLhs=false, isTypeInst=true, arrayPass=1,
