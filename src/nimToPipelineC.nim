@@ -1757,19 +1757,19 @@ proc toCodeVarSection(
         #hadArray[] = false
         var tempToAdd: string
         if have(n, @[nnkPragmaExpr]):
-          echo "nnkPragmaExpr: n[0]"
-          echo n[0].treeRepr
-          echo "----"
+          #echo "nnkPragmaExpr: n[0]"
+          #echo n[0].treeRepr
+          #echo "----"
           if have(n[0], @[nnkPragma], 1):
-            echo "nnkPragmaExpr: n[0][1]"
-            echo n[0][1].treeRepr
-            echo "----"
+            #echo "nnkPragmaExpr: n[0][1]"
+            #echo n[0][1].treeRepr
+            #echo "----"
             proc myInnerFunc(
               self: var Convert,
               someN: NimNode,
             ) =
-              echo "myInnerFunc(): "
-              echo someN.treeRepr
+              #echo "myInnerFunc(): "
+              #echo someN.treeRepr
               #if have(someN, @[nnkSym]):
               case someN.repr():
               of "cstatic":
@@ -1785,7 +1785,7 @@ proc toCodeVarSection(
             #  )
             #else:
             if n[0][1][0].kind == nnkCall:
-              echo "found nnkCall"
+              #echo "found nnkCall"
               self.myInnerFunc(
                 someN=n[0][1][0][0]
               )
