@@ -1695,11 +1695,11 @@ proc toCodeVarSection(
   addIndent(self.res, level)
   #echo repr(nodes) & " " & repr(nodes.kind)
   let n = nodes
-  echo "#----"
-  echo "toCodeVarSection(): start:"
-  echo n.repr
-  echo n.treeRepr
-  echo "----"
+  #echo "#----"
+  #echo "toCodeVarSection(): start:"
+  #echo n.repr
+  #echo n.treeRepr
+  #echo "----"
   case n.kind:
   of nnkIdentDefs:
     case n.len:
@@ -1757,16 +1757,34 @@ proc toCodeVarSection(
         #hadArray[] = false
         var tempToAdd: string
         if have(n, @[nnkPragmaExpr]):
+          echo "nnkPragmaExpr: n[0]"
+          echo n[0].treeRepr
+          echo "----"
           if have(n[0], @[nnkPragma], 1):
-            if have(n[0][1], @[nnkSym]):
-              case n[0][1][0].repr():
+            echo "nnkPragmaExpr: n[0][1]"
+            echo n[0][1].treeRepr
+            echo "----"
+            proc myInnerFunc(
+              self: var Convert,
+              someN: NimNode,
+            ) =
+              #if have(someN, @[nnkSym]):
+              case someN.repr():
               of "cstatic":
                 self.res.add "static "
               of "cconst":
                 self.res.add "const "
               else:
-                let n = n[0][1][0]
+                let n = someN
                 fail()
+            #if have(n[0], @[nnkCall]):
+            #  self.myInnerFunc(
+            #    someN=n[0][0]
+            #  )
+            #else:
+              self.myInnerFunc(
+                someN=n[0][1]
+              )
         self.hadArray = false
         #echo "test:"
         #echo n[1].getType().treeRepr
