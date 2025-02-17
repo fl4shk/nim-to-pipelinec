@@ -1695,11 +1695,11 @@ proc toCodeVarSection(
   addIndent(self.res, level)
   #echo repr(nodes) & " " & repr(nodes.kind)
   let n = nodes
-  #echo "#----"
-  #echo "toCodeVarSection(): start:"
-  #echo n.repr
-  #echo n.treeRepr
-  #echo "----"
+  echo "#----"
+  echo "toCodeVarSection(): start:"
+  echo n.repr
+  echo n.treeRepr
+  echo "----"
   case n.kind:
   of nnkIdentDefs:
     case n.len:
@@ -2307,6 +2307,7 @@ proc procDef(
           )
           #echo returnType
           #echo "--------"
+        #echo n.treeRepr
         var idx = 1
         for paramDef in n[1 .. ^1]:
           # the paramDef is like `x, y, z: float`
