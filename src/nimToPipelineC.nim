@@ -1768,6 +1768,8 @@ proc toCodeVarSection(
               self: var Convert,
               someN: NimNode,
             ) =
+              echo "myInnerFunc(): "
+              echo someN.treeRepr
               #if have(someN, @[nnkSym]):
               case someN.repr():
               of "cstatic":
@@ -1785,11 +1787,11 @@ proc toCodeVarSection(
             if n[0][1][0].kind == nnkCall:
               echo "found nnkCall"
               self.myInnerFunc(
-                someN=n[0][1][0]
+                someN=n[0][1][0][0]
               )
             else:
               self.myInnerFunc(
-                someN=n[0][1]
+                someN=n[0][1][0]
               )
         self.hadArray = false
         #echo "test:"
