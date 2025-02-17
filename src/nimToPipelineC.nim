@@ -1782,6 +1782,12 @@ proc toCodeVarSection(
             #    someN=n[0][0]
             #  )
             #else:
+            if n[0][1][0].kind == nnkCall:
+              echo "found nnkCall"
+              self.myInnerFunc(
+                someN=n[0][1][0]
+              )
+            else:
               self.myInnerFunc(
                 someN=n[0][1]
               )
