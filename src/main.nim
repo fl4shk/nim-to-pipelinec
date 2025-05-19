@@ -152,7 +152,8 @@ type
 #    else:
 #      result.ret = inp.a - inp.b
 proc `alu`*[T](
-  inp {.cconst.}: AluInp[T]
+  inp {.cconst.}: AluInp[T],
+  inp1{.cconst.}: AluInp[T],
 ): AluOutp[T] =
   #if inp.op == aokAdd:
   #  result.ret = inp.a + inp.b
@@ -206,7 +207,7 @@ proc myMain(
   #    arr: array[8, T]
   #var tempA: MyArray[Vec3[int]]
 
-  result = alu(inp)
+  result = alu(inp=inp, inp1=inp)
   #result = myVec3IntAlu(inp=inp)
 
 #proc myMain(
