@@ -131,6 +131,8 @@ type
   AluOpKind* = enum
     aokAdd,
     aokSub,
+    #aokBitand,
+    #aokBitor,
     #aokFakeAnd,
 
 type
@@ -153,7 +155,7 @@ type
 #      result.ret = inp.a - inp.b
 proc `alu`*[T](
   inp {.cconst.}: AluInp[T],
-  inp1{.cconst.}: AluInp[T],
+  inp1 {.cconst,cmainmhz: "300.0".}: AluInp[T],
 ): AluOutp[T] =
   #if inp.op == aokAdd:
   #  result.ret = inp.a + inp.b
@@ -271,8 +273,8 @@ proc myOuterOuterOuterMain(): AluOutp[Vec3[int]] =
 
 echo toPipelineC(
   myOuterOuterOuterMain,
-  regularC=false,
-  cppConstRefInp=true,
+  regularC=true,
+  cppConstRefInp=false,
 )
 #echo myOuterOuterOuterMain()
 

@@ -1561,7 +1561,9 @@ proc procDef(
                   last=if myLast < 0: paramRepr.high else: myLast - 1
                 )
               let paramName = findParamName(param.repr()) #param.repr()
-              #echo "dbg: paramName: " & paramName
+              #echo (
+              #  "dbg: paramName, kind: " & paramName & " " & $param.kind
+              #)
               #echo "dbg: param: start: " & $param.len()
               #for paramElem in param:
               #  echo paramElem.treeRepr()
@@ -1573,6 +1575,41 @@ proc procDef(
               of nnkIdentDefs:
                 #echo "dbg: nnkIdentDefs:"
                 #echo typeImpl[0][idx].treeRepr
+                var haveCconst: bool = false
+                if (
+                  param.kind == nnkPragmaExpr
+                ):
+                  #echo (
+                  #  "dbg test start:" & $param.have(@[nnkPragma], 1)
+                  #)
+                  #echo "dbg test treeRepr:" & $param.treeRepr
+                  ##echo param[1].repr()
+                  #if param.have(@[nnkPragma], 1):
+                  #  echo "dbg test 0: " & param[1].repr()
+                  #  echo "dbg test 1: " & $param[1].len()
+                  #  echo "dbg test 2: " & param[1].treeRepr
+                  #echo param.treeRepr()
+                  #echo "-- --"
+                  for myPragma in param[1]:
+                    if myPragma.repr() == "cconst":
+                      haveCconst = true
+                    #echo $myPragma.repr()
+                    #echo $myPragma.treeRepr
+                    #echo "--"
+                    #if myPragma.kind == nnkPragma:
+                    #  echo "myPragma: " & $myPragma.repr()
+                  #echo "----"
+                if (
+                  #(
+                  #  not self.cppConstRefInp
+                  #) and 
+                  (
+                    self.regularC
+                  ) and (
+                    haveCconst
+                  )
+                ):
+                  paramsStr.add "const "
                 paramsStr.add(
                   self.funcRenameIter(
                     paramType=(
@@ -1583,7 +1620,13 @@ proc procDef(
                     isVarDecl=true,
                   )
                 )
-                if self.cppConstRefInp:
+                if (
+                  (
+                    self.cppConstRefInp
+                  ) and (
+                    not haveCconst
+                  )
+                ):
                   paramsStr.add " IN"
               else:
                 discard
